@@ -1,0 +1,37 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+    networks:
+      - sri-network
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: smart-tourism-app
+    restart: unless-stopped
+    depends_on:
+      - qdrant
+    env_file:
+      - .env
+    environment:
+      # Sobrescribimos la URL para que apunte al servicio de Qdrant en la red de Docker
+      - QDRANT_URL=http://qdrant:6333
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    networks:
+      - sri-network
+
+networks:
+  sri-network:
+    driver: bridge
