@@ -16,7 +16,7 @@ class Destination(BaseModel):
     region: Optional[str] = Field(None, description="Región o estado dentro del país")
     description: str = Field(..., description="Descripción textual del destino")
     tags: List[str] = Field(default_factory=list, description="Lista de etiquetas o categorías")
-    image_urls: List[HttpUrl] = Field(default_factory=list, description="URLs de imágenes del destino")
+    image_urls: List[HttpUrl] = Field(default_factory=list, description="URLs de imágenes")
     coordinates: Optional[Tuple[float, float]] = Field(
         None, description="Coordenadas geográficas (latitud, longitud)"
     )
