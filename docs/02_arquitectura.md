@@ -27,3 +27,11 @@ Esta sección describe la arquitectura técnica del Smart Tourism Engine, los m�
 - **docs/**: Documentación técnica detallada siguiendo el formato LNCS.
 - **docker/**: Configuraciones para la contenedorización del sistema.
 - **scripts/**: Utilidades para tareas administrativas y de compilación del informe.
+
+## Observabilidad
+
+El sistema utiliza un esquema de **Logging Estructurado** en formato JSON, facilitando su integración con herramientas modernas de agregación y análisis de logs (como ELK Stack o Loki).
+
+- **Estandarización**: Todos los logs del sistema, incluyendo los de librerías de terceros y FastAPI, son redirigidos a la salida estándar (`stdout`) con una estructura coherente.
+- **Campos base**: `timestamp` (ISO-8601 UTC), `level`, `message`, `module`, `funcName` y `lineno`.
+- **Configuración**: El nivel de detalle se ajusta mediante la variable de entorno `LOG_LEVEL` (vía `src/config.py`).
