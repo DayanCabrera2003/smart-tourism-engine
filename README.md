@@ -1,5 +1,7 @@
 # Smart Tourism Engine
 
+![CI](https://github.com/dayancc/smart-tourism-engine/actions/workflows/ci.yml/badge.svg)
+
 Sistema de Recuperación de Información (SRI) para el dominio de **turismo y viajes**, desarrollado como Proyecto Integrador del curso de SRI (2025-2026, 2do semestre). El sistema permite consultas en lenguaje natural sobre destinos turísticos y devuelve resultados rankeados con respuestas generadas (RAG), con soporte multimodal (texto + imágenes) y recomendaciones personalizadas.
 
 ---
