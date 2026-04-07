@@ -63,3 +63,53 @@ Para configurar estas variables, copia el ejemplo:
 cp .env.example .env
 ```
 Y edita los valores según sea necesario.
+
+## Imagen Docker
+
+El sistema está diseñado para ejecutarse en contenedores Docker, lo que garantiza la portabilidad y la consistencia entre entornos.
+
+- **Imagen Base**: `python:3.11-slim`. Se ha elegido la variante `slim` para minimizar el tamaño de la imagen final y reducir la superficie de ataque, manteniendo solo lo esencial para ejecutar Python.
+- **Optimización de Capas**:
+  1. Instalación de dependencias del sistema mínimas.
+  2. Copia e instalación de dependencias de Python (aprovechando la caché de Docker).
+  3. Copia del código fuente del proyecto.
+- **Variables de Entorno**: El contenedor respeta las variables pasadas durante el `docker run` o vía `docker-compose`.
+
+Para construir la imagen localmente:
+```bash
+docker build -t smart-tourism-engine -f docker/Dockerfile .
+```
+
+## Orquestación con Docker Compose
+
+El despliegue completo se gestiona con `docker-compose.yml`, que orquestra los siguientes servicios:
+
+```mermaid
+graph TD
+    User([Usuario]) --> App[Servicio: app]
+    App --> Qdrant[Servicio: qdrant]
+    App --> SQLite[(Persistencia: SQLite)]
+    Qdrant --> VolQ[(Volumen: qdrant_storage)]
+```
+
+### Comandos de gestión
+
+- **Iniciar el sistema**:
+  ```bash
+  docker compose up -d --build
+  ```
+
+- **Ver logs**:
+  ```bash
+  docker compose logs -f app
+  ```
+
+- **Detener el sistema**:
+  ```bash
+  docker compose down
+  ```
+
+### Persistencia de Datos
+Se han configurado los siguientes volúmenes para asegurar que la información no se pierda al reiniciar contenedores:
+- `./data/qdrant_storage`: Persistencia de los vectores en Qdrant.
+- `./data`: Persistencia del catálogo SQLite y archivos procesados en el contenedor de la aplicación.
