@@ -35,3 +35,21 @@ El sistema utiliza un esquema de **Logging Estructurado** en formato JSON, facil
 - **Estandarización**: Todos los logs del sistema, incluyendo los de librerías de terceros y FastAPI, son redirigidos a la salida estándar (`stdout`) con una estructura coherente.
 - **Campos base**: `timestamp` (ISO-8601 UTC), `level`, `message`, `module`, `funcName` y `lineno`.
 - **Configuración**: El nivel de detalle se ajusta mediante la variable de entorno `LOG_LEVEL` (vía `src/config.py`).
+
+## Estrategia de Testing
+
+El proyecto adopta un enfoque de desarrollo basado en pruebas (TDD incremental) para asegurar la integridad de los componentes del SRI.
+
+- **Tests de Humo (Smoke Tests)**: Verificaciones rápidas de la configuración y dependencias base (`tests/test_smoke.py`).
+- **Tests Unitarios**: Validación de funciones puras, lógica de recuperación y normalización de texto.
+- **Tests de Integración**: Pruebas de flujo completo entre la API, el índice invertido y Qdrant.
+- **Evaluación de RI**: Medición de métricas de calidad (Precision@k, Recall, etc.) sobre el corpus de prueba.
+
+Para ejecutar los tests:
+```bash
+pytest
+```
+o con reporte de cobertura:
+```bash
+pytest --cov=src
+```
