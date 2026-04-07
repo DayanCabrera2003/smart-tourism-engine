@@ -36,3 +36,29 @@ El modelo utiliza validación estricta de tipos (incluyendo la validez de las UR
 Para el desarrollo inicial, se ha implementado un pipeline de adquisición ligero:
 1. **Descarga (`scripts/download_wikivoyage.py`)**: Utiliza la API de MediaWiki para obtener el contenido crudo (wikitext) de destinos seleccionados de España en formato JSON.
 2. **Parsing (`src/ingestion/wikivoyage.py`)**: Procesa el wikitext, extrae coordenadas geográficas, limpia etiquetas y genera objetos `Destination` unificados en `data/raw/destinations_raw.jsonl`.
+
+#### Diagrama del Pipeline
+
+```mermaid
+graph LR
+    WV[Wikivoyage API] -->|Download| Raw[JSON Crudo]
+    Raw -->|Parser| Parse[Modelo Destination Raw]
+    Parse -->|Normalización| Norm[Texto Limpio y Normalizado]
+    Norm -->|Guardar| Proc[destinations.jsonl]
+    
+    subgraph Adquisición
+    WV
+    Raw
+    end
+    
+    subgraph Preprocesamiento
+    Parse
+    Norm
+    end
+    
+    subgraph Salida
+    Proc
+    end
+```
+
+La implementación coordinada se encuentra en `src/ingestion/pipeline.py`.
