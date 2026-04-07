@@ -13,13 +13,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Lista de destinos iniciales para el MVP (España)
+# Lista de 50 destinos clave de España para el catálogo
 INITIAL_DESTINATIONS = [
-    "Madrid",
-    "Barcelona",
-    "Seville",
-    "Granada",
-    "Valencia"
+    "Madrid", "Barcelona", "Seville", "Granada", "Valencia",
+    "Bilbao", "San Sebastian", "Cordoba", "Santiago de Compostela", "Malaga",
+    "Toledo", "Segovia", "Salamanca", "Avila", "Caceres",
+    "Cuenca", "Zaragoza", "Palma de Mallorca", "Ibiza", "Santa Cruz de Tenerife",
+    "Las Palmas de Gran Canaria", "Alicante", "Cadiz", "Jerez de la Frontera", "Almeria",
+    "Oviedo", "Gijon", "Santander", "Pamplona", "Logroño",
+    "Murcia", "Cartagena", "Huelva", "Burgos", "Leon",
+    "Vitoria-Gasteiz", "Merida", "Tarragona", "Girona", "Lleida",
+    "Alcalá de Henares", "Badajoz", "Teruel", "Soria", "Guadalajara",
+    "Ciudad Real", "Albacete", "Lugo", "Ourense", "Pontevedra"
 ]
 
 WIKIVOYAGE_API_URL = "https://en.wikivoyage.org/w/api.php"

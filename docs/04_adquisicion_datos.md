@@ -62,3 +62,16 @@ graph LR
 ```
 
 La implementación coordinada se encuentra en `src/ingestion/pipeline.py`.
+
+### Estadísticas del Corpus (Corte 1)
+
+Tras la ejecución del pipeline de ingestión sobre Wikivoyage para destinos en España, el estado del corpus es el siguiente:
+
+| Métrica | Valor |
+|---------|-------|
+| **Total de destinos** | 50 |
+| **Países cubiertos** | España (50) |
+| **Longitud media descripción** | 606.88 caracteres |
+| **Fuente dominante** | Wikivoyage |
+
+Estas estadísticas se generan mediante el script `scripts/stats.py`.
