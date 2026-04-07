@@ -13,17 +13,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar archivos de dependencias
+# Copiar archivos de configuración del proyecto
 COPY pyproject.toml .
-COPY requirements.txt .
 
-# Instalar dependencias del proyecto
-# Se instala en modo editable para que el paquete 'src' sea reconocido correctamente
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -e .
-
-# Copiar el código fuente y el archivo de configuración de pytest
+# Copiar el código fuente antes de instalar (necesario para 'pip install .')
 COPY src/ ./src/
+
+# Instalar el proyecto y sus dependencias (sin modo editable para una instalación limpia)
+RUN pip install --no-cache-dir .
+
+# Copiar archivos adicionales para tests y configuración
 COPY tests/ ./tests/
 COPY pytest.ini .
 
