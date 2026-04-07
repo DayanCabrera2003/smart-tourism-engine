@@ -1,0 +1,32 @@
+from pathlib import Path
+from typing import Optional
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """
+    Configuración global de la aplicación.
+    Utiliza Pydantic Settings para leer variables de entorno y archivos .env.
+    """
+
+    # URL de la base de datos vectorial Qdrant
+    QDRANT_URL: str = "http://localhost:6333"
+
+    # API Key para el LLM 
+    LLM_API_KEY: Optional[str] = None
+
+    # Nivel de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    LOG_LEVEL: str = "INFO"
+
+    # Directorio base para los datos del proyecto
+    DATA_DIR: Path = Path("data")
+
+    # Configuración de carga de variables de entorno
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+
+# Instancia única de settings para ser importada en el resto de la aplicación
+settings = Settings()
