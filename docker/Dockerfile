@@ -33,5 +33,5 @@ RUN mkdir -p data/raw data/processed data/eval
 # Exponer el puerto (FastAPI por defecto usa 8000, Streamlit 8501)
 EXPOSE 8000 8501
 
-# Por defecto, ejecutamos el main de verificación
-CMD ["python", "src/main.py"]
+# Por defecto, ejecutamos el main de verificación como módulo
+CMD ["python", "-m", "src.main"]

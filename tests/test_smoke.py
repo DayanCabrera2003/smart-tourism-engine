@@ -1,6 +1,7 @@
-import pytest
-from src.config import settings
 from pathlib import Path
+
+from src.config import settings
+
 
 def test_settings_load():
     """
