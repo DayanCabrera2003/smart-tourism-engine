@@ -1,20 +1,7 @@
 import httpx
 import pytest
 
-from src.config import Settings
 from src.ingestion.opentripmap import OpenTripMapClient
-
-@pytest.fixture
-def mock_settings():
-    """Fixture para mockear las configuraciones con una API key de prueba."""
-    original_settings = Settings()
-    original_settings.OPENTRIPMAP_API_KEY = "test_api_key"
-    return original_settings
-
-@pytest.fixture
-def opentripmap_client(mock_settings):
-    """Fixture que proporciona una instancia de OpenTripMapClient con una API key mockeada."""
-    return OpenTripMapClient(api_key=mock_settings.OPENTRIPMAP_API_KEY)
 
 @pytest.mark.asyncio
 async def test_client_initialization_no_api_key():
