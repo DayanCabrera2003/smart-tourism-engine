@@ -47,12 +47,12 @@ class OpenTripMapClient:
         await self.close()
         return False  # No suprime excepciones
 
-    async def _request(self, endpoint: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def _request(self, endpoint: str, params: Dict[str, Any]) -> Optional[Any]:
         """
         Realiza una solicitud genérica a la API de OpenTripMap.
+        Puede retornar un dict o una lista, según el endpoint.
         """
         full_params = {"apikey": self.api_key, **params}
-        
         try:
             response = await self.client.get(endpoint, params=full_params)
             response.raise_for_status()  # Lanza una excepción para códigos de estado HTTP 4xx/5xx
@@ -96,9 +96,13 @@ class OpenTripMapClient:
             params["kinds"] = kinds
         
         data = await self._request(endpoint, params)
-        if data and "features" in data:
+        # data puede ser dict (con "features") o lista
+        if isinstance(data, dict) and "features" in data:
             logger.info(f"Obtenidos {len(data['features'])} POIs de OpenTripMap en bbox.")
             return data["features"]
+        elif isinstance(data, list):
+            logger.info(f"Obtenidos {len(data)} POIs de OpenTripMap en bbox (lista).")
+            return data
         return []
 
     async def get_poi_details(self, xid: str) -> Optional[Dict[str, Any]]:
