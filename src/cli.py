@@ -1,8 +1,10 @@
-import typer
 
+import typer
 from src.config import settings
 from src.ingestion.pipeline import ingest_wikivoyage
-from src.logging_config import logger
+from src.logging_config import setup_logging, logger
+
+setup_logging()
 
 app = typer.Typer(help="CLI para el Smart Tourism Engine")
 ingest_app = typer.Typer(help="Comandos de ingestión de datos")
