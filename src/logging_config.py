@@ -53,8 +53,6 @@ def setup_logging():
     # logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
 
-# Ejecutar configuración inicial al importar el módulo
-setup_logging()
 
 # Logger base para ser usado en el resto del proyecto
 logger = logging.getLogger("smart_tourism")
