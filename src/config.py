@@ -31,5 +31,15 @@ class Settings(BaseSettings):
     )
 
 
-# Instancia única de settings para ser importada en el resto de la aplicación
-settings = Settings()
+
+# Instancia lazy de settings para facilitar testing y override
+_settings: Optional[Settings] = None
+
+def get_settings() -> Settings:
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
+
+# Para compatibilidad con imports existentes
+settings = get_settings()
