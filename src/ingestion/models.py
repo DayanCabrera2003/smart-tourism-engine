@@ -14,7 +14,8 @@ class Destination(BaseModel):
     name: str = Field(..., description="Nombre del destino")
     country: str = Field(..., description="País al que pertenece el destino")
     region: Optional[str] = Field(None, description="Región o estado dentro del país")
-    description: str = Field(..., description="Descripción textual del destino")
+    description: str = Field(..., description="Descripción textual del destino (con acentos)")
+    description_normalized: Optional[str] = Field(None, description="Descripción normalizada (sin acentos, minúsculas, etc.) para matching/indexación")
     tags: List[str] = Field(default_factory=list, description="Lista de etiquetas o categorías")
     image_urls: List[HttpUrl] = Field(default_factory=list, description="URLs de imágenes")
     coordinates: Optional[Tuple[float, float]] = Field(
@@ -31,6 +32,7 @@ class Destination(BaseModel):
                 "country": "España",
                 "region": "Comunidad de Madrid",
                 "description": "Capital de España, conocida por sus museos y vida nocturna.",
+                "description_normalized": "capital de espana conocida por sus museos y vida nocturna.",
                 "tags": ["ciudad", "cultura", "museos"],
                 "image_urls": ["https://example.com/madrid.jpg"],
                 "coordinates": (40.416775, -3.703790),
