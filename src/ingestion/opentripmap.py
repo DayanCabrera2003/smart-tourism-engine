@@ -1,5 +1,6 @@
 
 from typing import Any, Dict, List, Optional
+import asyncio
 
 import httpx
 
@@ -47,28 +48,37 @@ class OpenTripMapClient:
         await self.close()
         return False  # No suprime excepciones
 
+    MAX_RETRIES = 3
+
     async def _request(self, endpoint: str, params: Dict[str, Any]) -> Optional[Any]:
         """
-        Realiza una solicitud genérica a la API de OpenTripMap.
+        Realiza una solicitud genérica a la API de OpenTripMap con manejo de rate limiting (429).
         Puede retornar un dict o una lista, según el endpoint.
         """
         full_params = {"apikey": self.api_key, **params}
-        try:
-            response = await self.client.get(endpoint, params=full_params)
-            response.raise_for_status()  # Lanza una excepción para códigos de estado HTTP 4xx/5xx
-            return response.json()
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                f"Error HTTP al consultar OpenTripMap {endpoint}: "
-                f"{e.response.status_code} - {e.response.text}"
-            )
-            return None
-        except httpx.RequestError as e:
-            logger.error(f"Error de red/solicitud al consultar OpenTripMap {endpoint}: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Error inesperado al consultar OpenTripMap {endpoint}: {e}")
-            return None
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                response = await self.client.get(endpoint, params=full_params)
+                if response.status_code == 429:
+                    wait = 2 ** attempt
+                    logger.warning(f"Rate limited, retrying in {wait}s...")
+                    await asyncio.sleep(wait)
+                    continue
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                logger.error(
+                    f"Error HTTP al consultar OpenTripMap {endpoint}: "
+                    f"{e.response.status_code} - {e.response.text}"
+                )
+                return None
+            except httpx.RequestError as e:
+                logger.error(f"Error de red/solicitud al consultar OpenTripMap {endpoint}: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Error inesperado al consultar OpenTripMap {endpoint}: {e}")
+                return None
+        return None
 
     async def get_pois_in_bbox(
         self,
