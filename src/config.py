@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # API Key para el LLM 
     LLM_API_KEY: Optional[str] = None
 
+    # API Key para OpenTripMap
+    OPENTRIPMAP_API_KEY: Optional[str] = None
+
     # Nivel de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     LOG_LEVEL: str = "INFO"
 
