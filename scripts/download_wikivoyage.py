@@ -1,7 +1,9 @@
 import json
 import logging
+
 import sys
 from pathlib import Path
+from src.config import settings
 
 import httpx
 
@@ -66,7 +68,7 @@ def download_pages(pages: list[str], output_dir: Path):
 
 
 def main():
-    raw_dir = Path("data/raw/wikivoyage")
+    raw_dir = settings.DATA_DIR / "raw" / "wikivoyage"
     logger.info(f"Iniciando descarga de {len(INITIAL_DESTINATIONS)} destinos...")
     download_pages(INITIAL_DESTINATIONS, raw_dir)
     logger.info("Descarga completada.")
