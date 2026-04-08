@@ -59,7 +59,7 @@ class WikivoyageParser:
 
             # Construir objeto Destination
             dest = Destination(
-                id=title.lower().replace(" ", "-"),
+                id=f"wikivoyage-{title.lower().replace(' ', '-')}",
                 name=title,
                 country=self.default_country,  # Ahora configurable
                 description=self.clean_text(content),
