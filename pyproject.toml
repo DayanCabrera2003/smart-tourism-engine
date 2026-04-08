@@ -22,6 +22,8 @@ dev = [
     "pytest",
     "httpx",
     "pytest-cov",
+    "pytest-httpx",
+    "pytest-asyncio",
     "ruff",
     "black",
     "isort",
