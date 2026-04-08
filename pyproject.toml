@@ -15,6 +15,7 @@ dependencies = [
     "pydantic-settings",
     "python-dotenv",
     "typer",
+    "httpx",
 ]
 
 [project.optional-dependencies]
