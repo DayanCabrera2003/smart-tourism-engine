@@ -26,9 +26,10 @@ def ingest_wikivoyage(input_dir: Path, output_file: Path) -> List[Destination]:
     for file_path in input_dir.glob("*.json"):
         dest = parser.parse_file(file_path)
         if dest:
-            # 2. Aplicar normalización de texto a la descripción
-            # Podríamos normalizar también el nombre si fuera necesario
-            dest.description = normalize_text(dest.description)
+            # Guardar la descripción original (con acentos)
+            original_desc = dest.description
+            # Guardar versión normalizada solo para matching/indexación
+            dest.description_normalized = normalize_text(original_desc)
             processed_destinations.append(dest)
 
     # 3. Guardar en data/processed/
