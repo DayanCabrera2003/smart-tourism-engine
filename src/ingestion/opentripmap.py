@@ -20,9 +20,32 @@ class OpenTripMapClient:
         if not api_key:
             raise ValueError("OpenTripMap API key is required.")
         self.api_key = api_key
+        self._owns_client = client is None  # Track if we created the client
         self.client = client if client else httpx.AsyncClient(
             base_url=self.BASE_URL, timeout=self.DEFAULT_TIMEOUT
         )
+
+    async def close(self):
+        """
+        Cierra la conexión HTTP del cliente.
+        Solo cierra el cliente si fue creado internamente por esta instancia.
+        """
+        if self._owns_client:
+            await self.client.aclose()
+
+    async def __aenter__(self):
+        """
+        Implementa el protocolo async context manager (entrada).
+        """
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Implementa el protocolo async context manager (salida).
+        Cierra la conexión HTTP al salir del contexto.
+        """
+        await self.close()
+        return False  # No suprime excepciones
 
     async def _request(self, endpoint: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """

@@ -14,7 +14,8 @@ class WikivoyageParser:
     en objetos del modelo Destination.
     """
 
-    def __init__(self):
+    def __init__(self, default_country: str = "Spain"):
+        self.default_country = default_country
         # Regex para extraer coordenadas {{Geo|lat|long|...}}
         self.geo_re = re.compile(r"{{Geo\|(-?\d+\.\d+)\|(-?\d+\.\d+)")
         # Regex para limpiar wikitext básico (enlaces [[Page|Text]] -> Text)
@@ -60,7 +61,7 @@ class WikivoyageParser:
             dest = Destination(
                 id=title.lower().replace(" ", "-"),
                 name=title,
-                country="Spain",  # Sabemos que son de España por el script de descarga
+                country=self.default_country,  # Ahora configurable
                 description=self.clean_text(content),
                 coordinates=coords,
                 tags=["city", "wikivoyage"],  # Tags base
@@ -74,31 +75,3 @@ class WikivoyageParser:
             return None
 
 
-def run_parser():
-    """Ejecuta el parser sobre los archivos descargados."""
-    input_dir = Path("data/raw/wikivoyage")
-    output_path = Path("data/raw/destinations_raw.jsonl")
-    
-    parser = WikivoyageParser()
-    destinations = []
-
-    if not input_dir.exists():
-        logger.error(f"No existe el directorio de entrada: {input_dir}")
-        return
-
-    for file_path in input_dir.glob("*.json"):
-        dest = parser.parse_file(file_path)
-        if dest:
-            destinations.append(dest)
-
-    if destinations:
-        with open(output_path, "w", encoding="utf-8") as f:
-            for dest in destinations:
-                f.write(dest.model_dump_json() + "\n")
-        logger.info(f"Parseados {len(destinations)} destinos y guardados en {output_path}")
-    else:
-        logger.warning("No se pudieron parsear destinos.")
-
-
-if __name__ == "__main__":
-    run_parser()
