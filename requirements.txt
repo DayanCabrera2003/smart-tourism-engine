@@ -4,3 +4,13 @@ pydantic
 pydantic-settings
 python-dotenv
 typer
+httpx
+# Development dependencies
+pytest
+pytest-cov
+pytest-httpx
+pytest-asyncio
+ruff
+black
+isort
+pre-commit
