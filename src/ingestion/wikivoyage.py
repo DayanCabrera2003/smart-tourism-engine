@@ -16,8 +16,9 @@ class WikivoyageParser:
 
     def __init__(self, default_country: str = "Spain"):
         self.default_country = default_country
-        # Regex para extraer coordenadas {{Geo|lat|long|...}}
-        self.geo_re = re.compile(r"{{Geo\|(-?\d+\.\d+)\|(-?\d+\.\d+)")
+        # Regex para extraer coordenadas {{Geo|lat|long|...}} o {{geo|...}}
+        # Soporta enteros y decimales: {{Geo|48|2}}, {{Geo|48.5|-3}}, {{geo|-34|-58.5}}
+        self.geo_re = re.compile(r"{{[Gg]eo\|(-?\d+(?:\.\d+)?)\|(-?\d+(?:\.\d+)?)")
         # Regex para limpiar wikitext básico (enlaces [[Page|Text]] -> Text)
         self.link_re = re.compile(r"\[\[(?:[^|\]]*\|)?([^\]]+)\]\]")
         # Regex para plantillas {{...}}
