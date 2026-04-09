@@ -176,3 +176,52 @@ preprocess("The tourism in Spain is beautiful", language="english")
 ```
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_preprocess.py`.
+
+## Índice invertido
+
+El índice invertido es la estructura central del sistema de recuperación. Mapea cada término del vocabulario a la lista de documentos que lo contienen (*postings list*), junto con la frecuencia de aparición (TF crudo).
+
+### Estructura de datos
+
+```
+_index: dict[term, list[(doc_id, freq)]]
+
+Ejemplo:
+{
+  "turism": [("dest_001", 3), ("dest_042", 1)],
+  "play":   [("dest_001", 2), ("dest_007", 5)],
+  "herm":   [("dest_007", 1)],
+}
+```
+
+### Implementación
+
+La clase `InvertedIndex` en `src/indexing/inverted_index.py` expone:
+
+| Método / Propiedad | Descripción |
+|--------------------|-------------|
+| `add_document(doc_id, tokens)` | Indexa un documento con sus tokens preprocesados; acumula frecuencias (TF crudo). |
+| `get_postings(term) -> list[(doc_id, freq)]` | Devuelve los postings del término, ordenados por `doc_id`. Lista vacía si no existe. |
+| `vocabulary` | Conjunto de términos en el índice. |
+| `doc_count` | Número de documentos indexados. |
+| `len(index)` | Tamaño del vocabulario. |
+| `term in index` | Comprueba si un término está indexado. |
+
+### Ejemplo de uso
+
+```python
+from src.indexing.inverted_index import InvertedIndex
+from src.indexing.preprocess import preprocess
+
+index = InvertedIndex()
+index.add_document("dest_001", preprocess("Playas hermosas en Mallorca"))
+index.add_document("dest_002", preprocess("Turismo de playa en Ibiza"))
+
+index.get_postings("play")
+# → [("dest_001", 1), ("dest_002", 1)]
+
+index.get_postings("turism")
+# → [("dest_002", 1)]
+```
+
+Las pruebas unitarias asociadas se encuentran en `tests/test_inverted_index.py`.
