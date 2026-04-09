@@ -24,20 +24,23 @@ def ingest_wikivoyage(input_dir: Path, output_file: Path) -> List[Destination]:
     Ejecuta el pipeline completo para Wikivoyage:
     Parser -> Normalización -> Persistencia en data/processed/
     """
+    if not input_dir.exists():
+        logger.error(f"El directorio de entrada no existe: {input_dir}")
+        return []
+
     logger.info(f"Iniciando pipeline de ingestión desde {input_dir}")
 
     country_map = _load_country_map(input_dir)
     parser = WikivoyageParser()
     processed_destinations = []
 
-    if not input_dir.exists():
-        logger.error(f"El directorio de entrada no existe: {input_dir}")
+    # 1. Parsing de archivos raw
+    json_files = [f for f in input_dir.glob("*.json") if f.name != "country_map.json"]
+    if not json_files:
+        logger.warning(f"No se encontraron archivos JSON en {input_dir}")
         return []
 
-    # 1. Parsing de archivos raw
-    for file_path in input_dir.glob("*.json"):
-        if file_path.name == "country_map.json":
-            continue
+    for file_path in json_files:
         dest = parser.parse_file(file_path)
         if dest:
             # Asignar país correcto desde el mapeo (fallback: Spain)
@@ -47,6 +50,9 @@ def ingest_wikivoyage(input_dir: Path, output_file: Path) -> List[Destination]:
             # Guardar versión normalizada solo para matching/indexación
             dest.description_normalized = normalize_text(original_desc)
             processed_destinations.append(dest)
+
+    if not processed_destinations:
+        logger.warning(f"Ningún archivo pudo parsearse correctamente ({len(json_files)} archivos intentados)")
 
     # 3. Guardar en data/processed/ (JSONL) y en SQLite
     if processed_destinations:
@@ -67,8 +73,6 @@ def ingest_wikivoyage(input_dir: Path, output_file: Path) -> List[Destination]:
             f"Pipeline completado: {len(processed_destinations)} destinos en {output_file}, "
             f"{persisted} persistidos en SQLite"
         )
-    else:
-        logger.warning("No se procesaron destinos en el pipeline.")
 
     return processed_destinations
 
