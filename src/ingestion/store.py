@@ -2,12 +2,12 @@
 Persistencia de destinos turísticos en SQLite usando SQLAlchemy.
 Incluye función upsert_destination().
 """
-from typing import Optional
-from sqlalchemy import create_engine, Column, String, Float, DateTime, Table, MetaData, select, insert, update
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.orm import sessionmaker
 import json
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, Float, MetaData, String, Table, create_engine
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.orm import sessionmaker
 
 from src.config import settings
 

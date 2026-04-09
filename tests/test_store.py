@@ -1,8 +1,11 @@
-import pytest
-from src.ingestion.models import Destination
-from src.ingestion.store import upsert_destination, engine, destinations
-from sqlalchemy import select
 from datetime import datetime
+
+import pytest
+from sqlalchemy import select
+
+from src.ingestion.models import Destination
+from src.ingestion.store import destinations, engine, upsert_destination
+
 
 @pytest.mark.usefixtures("clean_db")
 def test_upsert_destination(tmp_path, monkeypatch):

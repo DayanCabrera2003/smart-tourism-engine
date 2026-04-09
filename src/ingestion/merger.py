@@ -8,9 +8,10 @@ Uso:
     from src.ingestion.merger import merge_destinations
     destinos = merge_destinations([wikivoyage_list, opentripmap_list, ...])
 """
+from math import atan2, cos, radians, sin, sqrt
 from typing import List
+
 from src.ingestion.models import Destination
-from math import radians, cos, sin, sqrt, atan2
 
 HAVERSINE_THRESHOLD_KM = 1.0
 
@@ -46,9 +47,11 @@ def merge_destinations(list_of_lists: List[List[Destination]]) -> List[Destinati
             coord = dest.coordinates
             found = False
             for i, (n2, c2) in enumerate(seen):
-                coords_match = (coord is None and c2 is None) or haversine(coord, c2) < HAVERSINE_THRESHOLD_KM
+                coords_match = (coord is None and c2 is None) or (
+                    haversine(coord, c2) < HAVERSINE_THRESHOLD_KM
+                )
                 if name_norm == n2 and coords_match:
-                    # Fusionar información: prioriza el primer destino, pero añade tags, imágenes, etc.
+                    # Fusionar: prioriza el primer destino, añade tags e imágenes.
                     merged[i].tags = list(set(merged[i].tags) | set(dest.tags))
                     merged[i].image_urls = list(set(merged[i].image_urls) | set(dest.image_urls))
                     if not merged[i].description and dest.description:

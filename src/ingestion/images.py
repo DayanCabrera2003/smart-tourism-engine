@@ -4,10 +4,12 @@ Descarga imágenes de destinos turísticos a data/raw/images/{destination_id}/
 - Limita tamaño máximo (por defecto 2MB)
 - Crea carpetas por destino
 """
-from typing import List, Optional
-import httpx
 from pathlib import Path
-from urllib.parse import urlparse, unquote
+from typing import List, Optional
+from urllib.parse import unquote, urlparse
+
+import httpx
+
 from src.ingestion.models import Destination
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}

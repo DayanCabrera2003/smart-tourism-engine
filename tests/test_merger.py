@@ -1,7 +1,12 @@
 from datetime import datetime
-from src.ingestion.models import Destination
+
 from src.ingestion.merger import merge_destinations
-def make_dest(id, name, lat, lon, source, tags=None, image_urls=None, region=None, description=None):
+from src.ingestion.models import Destination
+
+
+def make_dest(
+    id, name, lat, lon, source, tags=None, image_urls=None, region=None, description=None
+):
     return Destination(
         id=id,
         name=name,
@@ -16,7 +21,11 @@ def make_dest(id, name, lat, lon, source, tags=None, image_urls=None, region=Non
     )
 
 def test_merge_destinations_dedup():
-    d1 = make_dest("1", "Madrid", 40.4168, -3.7038, "wikivoyage", tags=["ciudad"], image_urls=["http://img1.com"], region="Comunidad de Madrid", description="Capital de España")
+    d1 = make_dest(
+        "1", "Madrid", 40.4168, -3.7038, "wikivoyage",
+        tags=["ciudad"], image_urls=["http://img1.com"],
+        region="Comunidad de Madrid", description="Capital de España",
+    )
     d2 = make_dest("2", "Madrid ", 40.41681, -3.70381, "opentripmap", tags=["capital"], image_urls=["http://img2.com"])
     d3 = make_dest("3", "Barcelona", 41.3879, 2.16992, "wikivoyage")
     merged = merge_destinations([[d1], [d2], [d3]])

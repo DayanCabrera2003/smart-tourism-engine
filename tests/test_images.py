@@ -1,8 +1,10 @@
-import pytest
-import asyncio
 from pathlib import Path
-from src.ingestion.models import Destination
+
+import pytest
+
 from src.ingestion.images import download_images_for_destination
+from src.ingestion.models import Destination
+
 
 @pytest.mark.asyncio
 async def test_download_images_for_destination(monkeypatch, tmp_path):

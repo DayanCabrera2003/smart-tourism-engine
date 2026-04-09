@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import delete
-from src.ingestion.store import engine, destinations
+
+from src.ingestion.store import destinations, engine
 
 
 @pytest.fixture
