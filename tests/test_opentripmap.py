@@ -2,6 +2,7 @@
 import httpx
 import pytest
 from httpx import Request, Response
+from unittest.mock import patch, AsyncMock
 
 from src.ingestion.opentripmap import OpenTripMapClient
 
@@ -26,18 +27,15 @@ async def test_get_pois_in_bbox_success(httpx_mock):
         # The base_url is set on the httpx.AsyncClient,
         # so request.url.path will be just the endpoint
         assert request.url.path == "/0.1/en/places/bbox"
-        assert request.url.query["apikey"] == "test_api_key"
-        assert request.url.query["lon_min"] == "-3.71"
-        assert request.url.query["lat_min"] == "40.40"
-        assert request.url.query["lon_max"] == "-3.67"
-        assert request.url.query["lat_max"] == "40.43"
-        assert request.url.query["limit"] == "50"
+        assert request.url.params["apikey"] == "test_api_key"
+        assert request.url.params["lon_min"] == "-3.71"
+        assert request.url.params["lat_min"] == "40.4"
+        assert request.url.params["lon_max"] == "-3.67"
+        assert request.url.params["lat_max"] == "40.43"
+        assert request.url.params["limit"] == "50"
         return Response(200, json=bbox_response, request=request)
 
-    httpx_mock.add_callback(
-        bbox_callback,
-        url="bbox", # Match only the endpoint path relative to client's base_url
-    )
+    httpx_mock.add_callback(bbox_callback)
 
     client = OpenTripMapClient(api_key="test_api_key")
     pois = await client.get_pois_in_bbox(lon_min=-3.71, lat_min=40.40, lon_max=-3.67, lat_max=40.43)
@@ -58,19 +56,16 @@ async def test_get_pois_in_bbox_with_kinds(httpx_mock):
 
     def bbox_kinds_callback(request: Request):
         assert request.url.path == "/0.1/en/places/bbox"
-        assert request.url.query["apikey"] == "test_api_key"
-        assert request.url.query["lon_min"] == "-3.71"
-        assert request.url.query["lat_min"] == "40.40"
-        assert request.url.query["lon_max"] == "-3.67"
-        assert request.url.query["lat_max"] == "40.43"
-        assert request.url.query["limit"] == "50"
-        assert request.url.query["kinds"] == "museums"
+        assert request.url.params["apikey"] == "test_api_key"
+        assert request.url.params["lon_min"] == "-3.71"
+        assert request.url.params["lat_min"] == "40.4"
+        assert request.url.params["lon_max"] == "-3.67"
+        assert request.url.params["lat_max"] == "40.43"
+        assert request.url.params["limit"] == "50"
+        assert request.url.params["kinds"] == "museums"
         return Response(200, json=bbox_response, request=request)
 
-    httpx_mock.add_callback(
-        bbox_kinds_callback,
-        url="bbox", # Match only the endpoint path relative to client's base_url
-    )
+    httpx_mock.add_callback(bbox_kinds_callback)
 
     client = OpenTripMapClient(api_key="test_api_key")
     pois = await client.get_pois_in_bbox(
@@ -86,13 +81,10 @@ async def test_get_pois_in_bbox_http_error(httpx_mock):
 
     def bbox_http_error_callback(request: Request):
         assert request.url.path == "/0.1/en/places/bbox"
-        assert request.url.query["apikey"] == "test_api_key"
+        assert request.url.params["apikey"] == "test_api_key"
         return Response(403, request=request)
 
-    httpx_mock.add_callback(
-        bbox_http_error_callback,
-        url="bbox", # Match only the endpoint path relative to client's base_url
-    )
+    httpx_mock.add_callback(bbox_http_error_callback)
 
     client = OpenTripMapClient(api_key="test_api_key")
     pois = await client.get_pois_in_bbox(lon_min=-3.71, lat_min=40.40, lon_max=-3.67, lat_max=40.43)
@@ -102,11 +94,12 @@ async def test_get_pois_in_bbox_http_error(httpx_mock):
 @pytest.mark.asyncio
 async def test_get_pois_in_bbox_network_error(httpx_mock):
     """Verifica el manejo de errores de red para get_pois_in_bbox."""
-    # Match any request to raise exception
-    httpx_mock.add_exception(httpx.RequestError("Network error")) 
+    # is_reusable=True para cubrir los MAX_RETRIES reintentos; sleep mockeado para rapidez
+    httpx_mock.add_exception(httpx.RequestError("Network error"), is_reusable=True)
 
-    client = OpenTripMapClient(api_key="test_api_key")
-    pois = await client.get_pois_in_bbox(lon_min=-3.71, lat_min=40.40, lon_max=-3.67, lat_max=40.43)
+    with patch("src.ingestion.opentripmap.asyncio.sleep", new_callable=AsyncMock):
+        client = OpenTripMapClient(api_key="test_api_key")
+        pois = await client.get_pois_in_bbox(lon_min=-3.71, lat_min=40.40, lon_max=-3.67, lat_max=40.43)
 
     assert pois == []
 
@@ -121,13 +114,10 @@ async def test_get_poi_details_success(httpx_mock):
     
     def details_callback(request: Request):
         assert request.url.path == "/0.1/en/places/xid/Q1"
-        assert request.url.query["apikey"] == "test_api_key"
+        assert request.url.params["apikey"] == "test_api_key"
         return Response(200, json=poi_details_response, request=request)
 
-    httpx_mock.add_callback(
-        details_callback,
-        url="xid/Q1", # Match only the endpoint path relative to client's base_url
-    )
+    httpx_mock.add_callback(details_callback)
 
     client = OpenTripMapClient(api_key="test_api_key")
     details = await client.get_poi_details("Q1")
@@ -141,13 +131,10 @@ async def test_get_poi_details_http_error(httpx_mock):
 
     def details_http_error_callback(request: Request):
         assert request.url.path == "/0.1/en/places/xid/Q1"
-        assert request.url.query["apikey"] == "test_api_key"
+        assert request.url.params["apikey"] == "test_api_key"
         return Response(404, request=request)
 
-    httpx_mock.add_callback(
-        details_http_error_callback,
-        url="xid/Q1", # Match only the endpoint path relative to client's base_url
-    )
+    httpx_mock.add_callback(details_http_error_callback)
 
     client = OpenTripMapClient(api_key="test_api_key")
     details = await client.get_poi_details("Q1")
@@ -157,10 +144,11 @@ async def test_get_poi_details_http_error(httpx_mock):
 @pytest.mark.asyncio
 async def test_get_poi_details_network_error(httpx_mock):
     """Verifica el manejo de errores de red para get_poi_details."""
-    # Match any request to raise exception
-    httpx_mock.add_exception(httpx.RequestError("Network error")) 
+    # is_reusable=True para cubrir los MAX_RETRIES reintentos; sleep mockeado para rapidez
+    httpx_mock.add_exception(httpx.RequestError("Network error"), is_reusable=True)
 
-    client = OpenTripMapClient(api_key="test_api_key")
-    details = await client.get_poi_details("Q1")
+    with patch("src.ingestion.opentripmap.asyncio.sleep", new_callable=AsyncMock):
+        client = OpenTripMapClient(api_key="test_api_key")
+        details = await client.get_poi_details("Q1")
 
     assert details is None
