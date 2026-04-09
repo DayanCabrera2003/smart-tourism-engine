@@ -50,34 +50,47 @@ class OpenTripMapClient:
 
     MAX_RETRIES = 3
 
+    # Códigos HTTP que justifican reintento (transitorios)
+    _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
     async def _request(self, endpoint: str, params: Dict[str, Any]) -> Optional[Any]:
         """
-        Realiza una solicitud genérica a la API de OpenTripMap con manejo de rate limiting (429).
-        Puede retornar un dict o una lista, según el endpoint.
+        Realiza una solicitud genérica a la API de OpenTripMap con reintentos
+        para rate limiting (429), errores de servidor 5xx y errores de red.
         """
         full_params = {"apikey": self.api_key, **params}
         for attempt in range(self.MAX_RETRIES):
             try:
                 response = await self.client.get(endpoint, params=full_params)
-                if response.status_code == 429:
+                if response.status_code in self._RETRYABLE_STATUS:
                     wait = 2 ** attempt
-                    logger.warning(f"Rate limited, retrying in {wait}s...")
+                    logger.warning(
+                        f"HTTP {response.status_code} en {endpoint}, "
+                        f"reintento {attempt + 1}/{self.MAX_RETRIES} en {wait}s..."
+                    )
                     await asyncio.sleep(wait)
                     continue
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
+                # Error no retriable (4xx excepto 429): fallo definitivo
                 logger.error(
                     f"Error HTTP al consultar OpenTripMap {endpoint}: "
                     f"{e.response.status_code} - {e.response.text}"
                 )
                 return None
             except httpx.RequestError as e:
-                logger.error(f"Error de red/solicitud al consultar OpenTripMap {endpoint}: {e}")
-                return None
+                # Error de red/timeout: reintentable
+                wait = 2 ** attempt
+                logger.warning(
+                    f"Error de red en {endpoint}: {e}. "
+                    f"Reintento {attempt + 1}/{self.MAX_RETRIES} en {wait}s..."
+                )
+                await asyncio.sleep(wait)
             except Exception as e:
                 logger.error(f"Error inesperado al consultar OpenTripMap {endpoint}: {e}")
                 return None
+        logger.error(f"Se agotaron los {self.MAX_RETRIES} reintentos para {endpoint}")
         return None
 
     async def get_pois_in_bbox(
