@@ -61,8 +61,40 @@ Devuelve un valor en `[0, 1]`.
 > **Estado actual (T032):** el método devuelve `0.0` como esqueleto.
 > Las fórmulas OR e AND se implementan en T033 y T034 respectivamente.
 
-## Fórmulas (introducción)
+## Fórmulas
 
-Los pesos $w_i \in [0, 1]$ son los pesos TF-IDF normalizados de cada término de la consulta en el documento evaluado. Las fórmulas se completan en las secciones siguientes conforme se implementan.
+Los pesos $w_i \in [0, 1]$ son los pesos TF-IDF normalizados de cada término de la consulta en el documento evaluado.
+
+### OR p-norm (T033)
+
+Para una consulta OR con $n$ términos y pesos $w_1, w_2, \ldots, w_n$:
+
+$$\text{sim}_{OR}(d, q) = \left( \frac{\sum_{i=1}^{n} w_i^{\,p}}{n} \right)^{1/p}$$
+
+**Propiedades clave:**
+
+| Valor de $p$ | Comportamiento |
+|---|---|
+| $p = 1$ | Media aritmética — comportamiento vectorial puro |
+| $p = 2$ | Norma euclidiana normalizada — recomendado para turismo |
+| $p \to \infty$ | $\max(w_i)$ — Booleano puro: basta que un término ocurra |
+
+**Ejemplo numérico** (Salton et al., 1983):
+
+Consulta: `"playa OR montaña"` con $p=2$.  
+Pesos en el documento: $w_{\text{playa}} = 0.6$, $w_{\text{montaña}} = 0.8$.
+
+$$\text{sim}_{OR} = \left( \frac{0.6^2 + 0.8^2}{2} \right)^{1/2} = \left( \frac{0.36 + 0.64}{2} \right)^{1/2} = \sqrt{0.5} \approx 0.707$$
+
+El documento obtiene una similitud de $0.707$, intermedia entre el 0 del Booleano clásico (si ningún término coincide perfectamente) y el 1 total.
+
+**Implementación:**
+
+```python
+from src.retrieval.extended_boolean import ExtendedBoolean
+
+eb = ExtendedBoolean(p=2.0)
+sim = eb.or_norm([0.6, 0.8])  # → 0.7071
+```
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_extended_boolean.py`.

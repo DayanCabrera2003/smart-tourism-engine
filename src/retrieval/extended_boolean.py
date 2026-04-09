@@ -1,10 +1,14 @@
-"""T032 — Esqueleto del Modelo Booleano Extendido (p-norm).
+"""T032/T033 — Modelo Booleano Extendido (p-norm).
 
 Referencia:
     Salton, G., Fox, E. A., & Wu, H. (1983).
     Extended Boolean information retrieval.
     Communications of the ACM, 26(11), 1022-1036.
 """
+
+from __future__ import annotations
+
+from collections.abc import Sequence
 
 __all__ = ["ExtendedBoolean"]
 
@@ -36,6 +40,27 @@ class ExtendedBoolean:
         if p <= 0:
             raise ValueError(f"El parámetro p debe ser > 0, se recibió: {p}")
         self.p = p
+
+    def or_norm(self, weights: Sequence[float]) -> float:
+        """Similitud OR p-norm (Salton, Fox & Wu, 1983, ecuación 4).
+
+        Fórmula:
+            sim_or = ( Σ wᵢᵖ / n ) ^ (1/p)
+
+        Con p=1 se obtiene la media aritmética (comportamiento vectorial).
+        Con p→∞ converge al máximo (Booleano puro: OR estricto).
+
+        Args:
+            weights: Pesos TF-IDF normalizados de los términos de la consulta
+                     en el documento evaluado. Cada peso debe estar en [0, 1].
+
+        Returns:
+            Similitud en [0, 1]. Devuelve 0.0 si la lista está vacía.
+        """
+        n = len(weights)
+        if n == 0:
+            return 0.0
+        return (sum(w ** self.p for w in weights) / n) ** (1.0 / self.p)
 
     def score(self, query: str, doc_id: str) -> float:
         """
