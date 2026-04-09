@@ -61,3 +61,30 @@ def tokenize(text: str) -> list[str]
 - **Mayúsculas y acentos combinados**: `"ÁRBOL"` → `["arbol"]`.
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_tokenizer.py`.
+
+## Stopwords
+
+Las stopwords son palabras funcionales de alta frecuencia (artículos, preposiciones, conjunciones) que no aportan valor discriminativo al índice. Eliminarlas reduce el tamaño del índice y mejora la precisión de la recuperación.
+
+### Justificación bilingüe
+
+El sistema indexa contenido tanto en **español** (fuente principal: Wikivoyage en español, OpenTripMap) como en **inglés** (descripciones de POIs en inglés de OpenTripMap). Usar una lista combinada evita que palabras funcionales de un idioma queden en el índice por no estar en la lista del otro.
+
+### Implementación
+
+La lógica se encuentra en `src/indexing/stopwords.py` y expone:
+
+- `STOPWORDS` — `frozenset[str]` con las palabras a eliminar, cargado al importar el módulo.
+- `remove_stopwords(tokens: list[str]) -> list[str]` — filtra la lista de tokens devolviendo solo los que no sean stopwords.
+
+La lista se carga desde **NLTK** (`nltk.corpus.stopwords`) combinando los idiomas `"spanish"` (313 palabras) e `"english"` (198 palabras). Si el corpus no está descargado, se descarga automáticamente en el primer uso.
+
+### Ejemplo
+
+```python
+tokens = ["el", "turismo", "en", "espana", "es", "bonito"]
+remove_stopwords(tokens)
+# → ["turismo", "espana", "bonito"]
+```
+
+Las pruebas unitarias asociadas se encuentran en `tests/test_stopwords.py`.
