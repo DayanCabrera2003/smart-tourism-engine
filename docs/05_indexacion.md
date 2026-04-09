@@ -201,7 +201,10 @@ La clase `InvertedIndex` en `src/indexing/inverted_index.py` expone:
 | Método / Propiedad | Descripción |
 |--------------------|-------------|
 | `add_document(doc_id, tokens)` | Indexa un documento con sus tokens preprocesados; acumula frecuencias (TF crudo). |
-| `get_postings(term) -> list[(doc_id, freq)]` | Devuelve los postings del término, ordenados por `doc_id`. Lista vacía si no existe. |
+| `get_postings(term) -> list[(doc_id, freq)]` | Devuelve los postings con TF crudo, ordenados por `doc_id`. |
+| `compute_tf_idf()` | Calcula pesos TF-IDF y normas L2 para todos los documentos. |
+| `get_tfidf_postings(term) -> list[(doc_id, weight)]` | Devuelve los postings con peso TF-IDF. Requiere `compute_tf_idf()`. |
+| `get_norm(doc_id) -> float` | Devuelve la norma L2 del documento para similitud coseno. |
 | `vocabulary` | Conjunto de términos en el índice. |
 | `doc_count` | Número de documentos indexados. |
 | `len(index)` | Tamaño del vocabulario. |
@@ -225,3 +228,48 @@ index.get_postings("turism")
 ```
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_inverted_index.py`.
+
+## TF-IDF
+
+El peso TF-IDF mide la importancia de un término en un documento relativa al resto de la colección. Términos frecuentes en un documento pero raros en la colección reciben mayor peso.
+
+### Fórmulas
+
+**TF normalizado** (evita sesgo por longitud del documento):
+
+$$TF(t, d) = \frac{freq(t, d)}{\max_{t' \in d} freq(t', d)}$$
+
+**IDF suavizado** (evita división por cero y penaliza menos los términos universales):
+
+$$IDF(t) = \log\!\left(\frac{N}{df(t)}\right) + 1$$
+
+**Peso TF-IDF:**
+
+$$w(t, d) = TF(t, d) \times IDF(t)$$
+
+**Norma L2** (necesaria para similitud coseno en recuperación futura):
+
+$$\|d\| = \sqrt{\sum_{t \in d} w(t, d)^2}$$
+
+Donde:
+- $freq(t, d)$: número de veces que aparece el término $t$ en el documento $d$.
+- $N$: número total de documentos en la colección.
+- $df(t)$: número de documentos que contienen el término $t$.
+
+### Flujo de uso
+
+```python
+index = InvertedIndex()
+for doc_id, tokens in corpus:
+    index.add_document(doc_id, tokens)
+
+index.compute_tf_idf()   # calcular pesos y normas
+
+index.get_tfidf_postings("play")
+# → [("dest_001", 0.693), ("dest_002", 0.347)]
+
+index.get_norm("dest_001")
+# → 1.234
+```
+
+Las pruebas unitarias asociadas se encuentran en `tests/test_tfidf.py`.
