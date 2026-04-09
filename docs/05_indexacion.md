@@ -126,3 +126,53 @@ El parámetro `language` es configurable: acepta `"spanish"` (por defecto) o `"e
 | `restaurantes` | `restaur` | — |
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_stemmer.py`.
+
+## Pipeline de preprocesamiento completo
+
+El módulo `src/indexing/preprocess.py` encadena los tres pasos anteriores en una única función pública:
+
+```python
+def preprocess(text: str, language: str = "spanish") -> list[str]
+```
+
+### Diagrama del pipeline
+
+```
+Texto de entrada
+      │
+      ▼
+┌─────────────┐
+│  tokenize() │  minúsculas + strip acentos + split [^a-z0-9]+
+└─────────────┘
+      │  list[str]
+      ▼
+┌──────────────────────┐
+│  remove_stopwords()  │  filtra palabras funcionales ES + EN
+└──────────────────────┘
+      │  list[str]
+      ▼
+┌────────────┐
+│   stem()   │  SnowballStemmer (configurable: "spanish" | "english")
+└────────────┘
+      │
+      ▼
+list[str]  ← stems listos para indexar
+```
+
+### Ejemplo
+
+```python
+preprocess("¡Playas hermosas de España!")
+# tokenize  → ["playas", "hermosas", "de", "espana"]
+# stopwords → ["playas", "hermosas", "espana"]  ("de" eliminado)
+# stem      → ["play", "herm", "espan"]
+```
+
+```python
+preprocess("The tourism in Spain is beautiful", language="english")
+# tokenize  → ["the", "tourism", "in", "spain", "is", "beautiful"]
+# stopwords → ["tourism", "spain", "beautiful"]
+# stem      → ["tourism", "spain", "beauti"]
+```
+
+Las pruebas unitarias asociadas se encuentran en `tests/test_preprocess.py`.
