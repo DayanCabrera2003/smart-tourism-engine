@@ -115,3 +115,27 @@ merged = merge_destinations([wikivoyage_destinations, opentripmap_destinations])
 ```
 
 ---
+
+## 3. Políticas de crawling y robots.txt
+
+A partir de la tarea T020, el sistema respeta las políticas de crawling de cada dominio:
+
+- **robots.txt**: Antes de descargar datos o imágenes de cualquier dominio, se consulta y respeta el archivo `robots.txt` usando la función `is_allowed(url)` de `src/ingestion/robots.py`.
+- **User-Agent identificable**: Todas las requests usan un User-Agent propio (`SmartTourismBot/1.0`).
+- **Delay configurable**: Se respeta el parámetro `Crawl-delay` si está definido en robots.txt, o un valor por defecto (1 segundo) entre requests al mismo dominio.
+- **Implementación**: El módulo `src/ingestion/robots.py` gestiona el cacheo y parsing de robots.txt, y expone la función `is_allowed(url)` y `crawl_delay(domain)`.
+
+### Ejemplo de uso
+
+```python
+from src.ingestion.robots import is_allowed, crawl_delay
+
+if is_allowed("https://example.com/foo.jpg"):
+    # Esperar crawl_delay("example.com") segundos antes de descargar
+    ...
+```
+
+### Consideraciones éticas
+- El sistema nunca descarga recursos prohibidos por robots.txt.
+- El User-Agent identifica claramente el propósito académico del bot.
+- El delay evita sobrecargar servidores de terceros.
