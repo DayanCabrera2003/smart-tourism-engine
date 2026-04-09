@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 INITIAL_DESTINATIONS = [
     # España (50)
     "Madrid", "Barcelona", "Seville", "Granada", "Valencia",
-    "Bilbao", "San Sebastian", "Cordoba", "Santiago de Compostela", "Malaga",
+    "Bilbao", "San Sebastian", "Córdoba (Spain)", "Santiago de Compostela", "Malaga",
     "Toledo", "Segovia", "Salamanca", "Avila", "Caceres",
     "Cuenca", "Zaragoza", "Palma de Mallorca", "Ibiza", "Santa Cruz de Tenerife",
     "Las Palmas de Gran Canaria", "Alicante", "Cadiz", "Jerez de la Frontera", "Almeria",
     "Oviedo", "Gijon", "Santander", "Pamplona", "Logroño",
-    "Murcia", "Cartagena", "Huelva", "Burgos", "Leon",
+    "Murcia", "Cartagena (Spain)", "Huelva", "Burgos", "Leon",
     "Vitoria-Gasteiz", "Merida", "Tarragona", "Girona", "Lleida",
-    "Alcalá de Henares", "Badajoz", "Teruel", "Soria", "Guadalajara",
+    "Alcalá de Henares", "Badajoz", "Teruel", "Soria", "Guadalajara (Spain)",
     "Ciudad Real", "Albacete", "Lugo", "Ourense", "Pontevedra",
     # Francia (20)
     "Paris", "Lyon", "Marseille", "Nice", "Bordeaux",
@@ -47,7 +47,7 @@ INITIAL_DESTINATIONS = [
     "York", "Canterbury", "Stonehenge", "Liverpool", "Manchester",
     "Bristol", "Brighton", "Cardiff", "Glasgow", "Dublin",
     # América Latina (40)
-    "Buenos Aires", "Mendoza", "Cordoba", "Salta",
+    "Buenos Aires", "Mendoza", "Córdoba", "Salta",
     "Rio de Janeiro", "Sao Paulo", "Salvador", "Florianopolis",
     "Mexico City", "Cancun", "Oaxaca", "Guadalajara",
     "Havana", "Trinidad",
@@ -62,7 +62,7 @@ INITIAL_DESTINATIONS = [
     "San Jose", "Manuel Antonio",
     "Panama City",
     "Guatemala City", "Antigua Guatemala",
-    "Havana", "Varadero",
+    "Varadero",
     "Santo Domingo", "Punta Cana",
     "San Juan",
     # Asia (25)
@@ -98,18 +98,18 @@ USER_AGENT = "SmartTourismEngine/0.1 (dayancc@example.com)"
 COUNTRY_MAP = {
     # España
     "Madrid": "Spain", "Barcelona": "Spain", "Seville": "Spain", "Granada": "Spain",
-    "Valencia": "Spain", "Bilbao": "Spain", "San Sebastian": "Spain", "Cordoba": "Spain",
+    "Valencia": "Spain", "Bilbao": "Spain", "San Sebastian": "Spain", "Córdoba (Spain)": "Spain",
     "Santiago de Compostela": "Spain", "Malaga": "Spain", "Toledo": "Spain",
     "Segovia": "Spain", "Salamanca": "Spain", "Avila": "Spain", "Caceres": "Spain",
     "Cuenca": "Spain", "Zaragoza": "Spain", "Palma de Mallorca": "Spain", "Ibiza": "Spain",
     "Santa Cruz de Tenerife": "Spain", "Las Palmas de Gran Canaria": "Spain",
     "Alicante": "Spain", "Cadiz": "Spain", "Jerez de la Frontera": "Spain",
     "Almeria": "Spain", "Oviedo": "Spain", "Gijon": "Spain", "Santander": "Spain",
-    "Pamplona": "Spain", "Logroño": "Spain", "Murcia": "Spain", "Cartagena": "Spain",
+    "Pamplona": "Spain", "Logroño": "Spain", "Murcia": "Spain", "Cartagena (Spain)": "Spain",
     "Huelva": "Spain", "Burgos": "Spain", "Leon": "Spain", "Vitoria-Gasteiz": "Spain",
     "Merida": "Spain", "Tarragona": "Spain", "Girona": "Spain", "Lleida": "Spain",
     "Alcalá de Henares": "Spain", "Badajoz": "Spain", "Teruel": "Spain", "Soria": "Spain",
-    "Guadalajara": "Spain", "Ciudad Real": "Spain", "Albacete": "Spain", "Lugo": "Spain",
+    "Guadalajara (Spain)": "Spain", "Ciudad Real": "Spain", "Albacete": "Spain", "Lugo": "Spain",
     "Ourense": "Spain", "Pontevedra": "Spain",
     # Francia
     "Paris": "France", "Lyon": "France", "Marseille": "France", "Nice": "France",
@@ -138,7 +138,7 @@ COUNTRY_MAP = {
     "Bristol": "United Kingdom", "Brighton": "United Kingdom", "Cardiff": "United Kingdom",
     "Glasgow": "United Kingdom", "Dublin": "Ireland",
     # América Latina
-    "Buenos Aires": "Argentina", "Mendoza": "Argentina", "Salta": "Argentina",
+    "Buenos Aires": "Argentina", "Mendoza": "Argentina", "Córdoba": "Argentina", "Salta": "Argentina",
     "Rio de Janeiro": "Brazil", "Sao Paulo": "Brazil", "Salvador": "Brazil",
     "Florianopolis": "Brazil",
     "Mexico City": "Mexico", "Cancun": "Mexico", "Oaxaca": "Mexico",
@@ -193,7 +193,6 @@ def save_country_map(output_dir: Path):
     """Guarda el mapeo título→país en un archivo JSON para uso del pipeline."""
     map_path = output_dir / "country_map.json"
     with open(map_path, "w", encoding="utf-8") as f:
-        import json
         json.dump(COUNTRY_MAP, f, ensure_ascii=False, indent=2)
     logger.info(f"country_map.json guardado en {map_path}")
 
