@@ -88,3 +88,41 @@ remove_stopwords(tokens)
 ```
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_stopwords.py`.
+
+## Stemming
+
+El stemming reduce cada token a su raíz morfológica (*stem*), agrupando variantes de una misma palabra bajo una representación común. Esto mejora el recall al unificar formas como "turismo", "turista" y "turístico" bajo el stem "turism".
+
+### Stemmer vs. Lemmatizer
+
+Se eligió **stemming** (en lugar de lemmatización) por las siguientes razones:
+
+| Criterio | Stemmer (Snowball) | Lemmatizer (spaCy/NLTK) |
+|----------|--------------------|-------------------------|
+| Velocidad | Muy rápido (reglas) | Lento (modelo neuronal) |
+| Dependencias | Solo NLTK | Modelos de idioma pesados |
+| Precisión lingüística | Menor (raíces heurísticas) | Mayor (formas canónicas) |
+| Adecuación para IR | Suficiente para recuperación por palabras clave | Overkill para este caso |
+
+Para un sistema de recuperación de información basado en índice invertido, la precisión lingüística exacta del lemmatizer no justifica el coste en velocidad y dependencias. El stemmer de Snowball es el estándar de facto en IR para español e inglés.
+
+### Implementación
+
+La lógica se encuentra en `src/indexing/stemmer.py` y expone:
+
+- `stem_token(token, language="spanish") -> str` — aplica stemming a un único token.
+- `stem(tokens, language="spanish") -> list[str]` — aplica stemming a una lista de tokens.
+
+El parámetro `language` es configurable: acepta `"spanish"` (por defecto) o `"english"`. Los stemmers se instancian una sola vez y se reutilizan mediante caché interna.
+
+### Ejemplos
+
+| Token | Stem (ES) | Stem (EN) |
+|-------|-----------|-----------|
+| `turismo` | `turism` | — |
+| `playas` | `play` | — |
+| `beaches` | — | `beach` |
+| `running` | — | `run` |
+| `restaurantes` | `restaur` | — |
+
+Las pruebas unitarias asociadas se encuentran en `tests/test_stemmer.py`.
