@@ -1,5 +1,7 @@
 import math
+import pickle
 from collections import defaultdict
+from pathlib import Path
 
 __all__ = ["InvertedIndex"]
 
@@ -133,3 +135,30 @@ class InvertedIndex:
 
     def __contains__(self, term: str) -> bool:
         return term in self._raw
+
+    def save(self, path: str | Path) -> None:
+        """Serializa el índice en disco usando pickle.
+
+        Args:
+            path: Ruta del archivo de salida (se crea si no existe).
+        """
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, path: str | Path) -> "InvertedIndex":
+        """Carga un índice previamente guardado con save().
+
+        Args:
+            path: Ruta del archivo pickle.
+
+        Raises:
+            FileNotFoundError: Si el archivo no existe.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"No existe el índice en: {path}")
+        with path.open("rb") as f:
+            return pickle.load(f)
