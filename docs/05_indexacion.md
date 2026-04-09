@@ -22,3 +22,42 @@ La normalización se implementa en `src/ingestion/normalize.py` y consta de los 
 | `  <p>¡Hola <b>España</b>!  </p> \n ¿Cómo está todo?  ` | `¡hola espana! ¿como esta todo?` |
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_normalize.py`.
+
+## Tokenización
+
+La tokenización es el proceso de dividir el texto normalizado en unidades mínimas de significado (tokens), que serán las entradas del índice invertido.
+
+### Implementación
+
+El tokenizador se encuentra en `src/indexing/tokenizer.py` y expone una única función pública:
+
+```python
+def tokenize(text: str) -> list[str]
+```
+
+### Pipeline interno
+
+1. **Minúsculas**: convierte todo el texto a minúsculas.
+2. **Eliminación de acentos**: transforma caracteres con diacríticos a su forma base (ej. `á` → `a`, `ñ` → `n`) mediante descomposición Unicode NFD.
+3. **Split por no-alfanuméricos**: divide el texto usando la expresión `[^a-z0-9]+` como separador, lo que elimina puntuación, signos de interrogación/exclamación y espacios en un solo paso.
+4. **Filtrado de tokens vacíos**: descarta los tokens resultantes que sean cadenas vacías.
+
+### Ejemplos
+
+| Entrada | Tokens |
+|---------|--------|
+| `"¡España es bonita!"` | `["espana", "es", "bonita"]` |
+| `"¿Cómo está todo?"` | `["como", "esta", "todo"]` |
+| `"hotel 5 estrellas"` | `["hotel", "5", "estrellas"]` |
+| `"Café, té y más..."` | `["cafe", "te", "y", "mas"]` |
+| `"!!! ???"` | `[]` |
+
+### Casos límite cubiertos
+
+- **Puntuación múltiple**: `"un-guión y punto.final"` → `["un", "guion", "y", "punto", "final"]`
+- **Solo puntuación**: devuelve lista vacía.
+- **Texto vacío o solo espacios**: devuelve lista vacía.
+- **Números**: se conservan como tokens (ej. `"2024"`, `"5"`).
+- **Mayúsculas y acentos combinados**: `"ÁRBOL"` → `["arbol"]`.
+
+Las pruebas unitarias asociadas se encuentran en `tests/test_tokenizer.py`.
