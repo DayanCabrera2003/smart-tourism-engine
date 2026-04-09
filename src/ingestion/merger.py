@@ -46,7 +46,8 @@ def merge_destinations(list_of_lists: List[List[Destination]]) -> List[Destinati
             coord = dest.coordinates
             found = False
             for i, (n2, c2) in enumerate(seen):
-                if name_norm == n2 and haversine(coord, c2) < HAVERSINE_THRESHOLD_KM:
+                coords_match = (coord is None and c2 is None) or haversine(coord, c2) < HAVERSINE_THRESHOLD_KM
+                if name_norm == n2 and coords_match:
                     # Fusionar información: prioriza el primer destino, pero añade tags, imágenes, etc.
                     merged[i].tags = list(set(merged[i].tags) | set(dest.tags))
                     merged[i].image_urls = list(set(merged[i].image_urls) | set(dest.image_urls))
