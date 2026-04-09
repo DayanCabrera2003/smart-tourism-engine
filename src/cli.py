@@ -12,6 +12,26 @@ ingest_app = typer.Typer(help="Comandos de ingestión de datos")
 app.add_typer(ingest_app, name="ingest")
 
 
+@app.command("build-index")
+def build_index_cmd():
+    """
+    Construye el índice invertido desde destinations.jsonl y lo guarda en index.pkl.
+
+    Lee de data/processed/destinations.jsonl y escribe en data/processed/index.pkl.
+    """
+    from src.indexing.build_index import build_index
+
+    source = settings.DATA_DIR / "processed" / "destinations.jsonl"
+    output = settings.DATA_DIR / "processed" / "index.pkl"
+
+    try:
+        count = build_index(source, output)
+        typer.echo(f"Índice construido: {count} documentos → {output}")
+    except FileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+
 @ingest_app.command("wikivoyage")
 def ingest_wikivoyage_cmd():
     """
