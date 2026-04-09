@@ -1,8 +1,9 @@
 
 import typer
+
 from src.config import settings
 from src.ingestion.pipeline import ingest_wikivoyage
-from src.logging_config import setup_logging, logger
+from src.logging_config import logger, setup_logging
 
 setup_logging()
 

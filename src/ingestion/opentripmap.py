@@ -1,11 +1,11 @@
 
-from typing import Any, Dict, List, Optional
 import asyncio
+from typing import Any, Dict, List, Optional
 
 import httpx
 
-from src.config import settings
 from src.logging_config import logger
+
 
 class OpenTripMapClient:
     """
@@ -134,7 +134,7 @@ class OpenTripMapClient:
         API endpoint: /places/xid/{xid}
         """
         endpoint = f"xid/{xid}"
-        data = await self._request(endpoint, {}) # No se requieren params adicionales para este endpoint
+        data = await self._request(endpoint, {})
         if data:
             return data
         return None

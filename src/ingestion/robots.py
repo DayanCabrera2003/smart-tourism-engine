@@ -2,9 +2,9 @@
 Políticas de crawling: respeto a robots.txt, delay configurable y User-Agent identificable.
 Incluye función is_allowed(url) y utilidad para delays.
 """
-import time
 import urllib.robotparser
 from urllib.parse import urlparse
+
 import httpx
 
 DEFAULT_USER_AGENT = "SmartTourismBot/1.0 (+https://github.com/your-org/smart-tourism-engine)"

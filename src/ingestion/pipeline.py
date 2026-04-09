@@ -5,8 +5,8 @@ from typing import List
 from src.config import settings
 from src.ingestion.models import Destination
 from src.ingestion.normalize import normalize_text
-from src.ingestion.wikivoyage import WikivoyageParser
 from src.ingestion.store import upsert_destination
+from src.ingestion.wikivoyage import WikivoyageParser
 from src.logging_config import logger
 
 
@@ -52,7 +52,10 @@ def ingest_wikivoyage(input_dir: Path, output_file: Path) -> List[Destination]:
             processed_destinations.append(dest)
 
     if not processed_destinations:
-        logger.warning(f"Ningún archivo pudo parsearse correctamente ({len(json_files)} archivos intentados)")
+        logger.warning(
+            f"Ningún archivo pudo parsearse correctamente "
+            f"({len(json_files)} archivos intentados)"
+        )
 
     # 3. Guardar en data/processed/ (JSONL) y en SQLite
     if processed_destinations:

@@ -1,12 +1,12 @@
 import json
 import logging
-import time
-
 import sys
+import time
 from pathlib import Path
-from src.config import settings
 
 import httpx
+
+from src.config import settings
 
 # Configuración básica de logging para el script
 logging.basicConfig(
@@ -140,7 +140,8 @@ COUNTRY_MAP = {
     "Bristol": "United Kingdom", "Brighton": "United Kingdom", "Cardiff": "United Kingdom",
     "Glasgow": "United Kingdom", "Dublin": "Ireland",
     # América Latina
-    "Buenos Aires": "Argentina", "Mendoza": "Argentina", "Córdoba": "Argentina", "Salta": "Argentina",
+    "Buenos Aires": "Argentina", "Mendoza": "Argentina",
+    "Córdoba": "Argentina", "Salta": "Argentina",
     "Rio de Janeiro": "Brazil", "Sao Paulo": "Brazil", "Salvador": "Brazil",
     "Florianopolis": "Brazil",
     "Mexico City": "Mexico", "Cancun": "Mexico", "Oaxaca": "Mexico",

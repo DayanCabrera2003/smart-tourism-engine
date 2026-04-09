@@ -1,5 +1,5 @@
-import pytest
-from src.ingestion.robots import is_allowed, RobotsCache
+from src.ingestion.robots import RobotsCache
+
 
 def test_is_allowed_permissive(monkeypatch):
     # Simula robots.txt permisivo

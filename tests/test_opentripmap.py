@@ -1,10 +1,12 @@
 
+from unittest.mock import AsyncMock, patch
+
 import httpx
 import pytest
 from httpx import Request, Response
-from unittest.mock import patch, AsyncMock
 
 from src.ingestion.opentripmap import OpenTripMapClient
+
 
 @pytest.mark.asyncio
 async def test_client_initialization_no_api_key():
@@ -99,7 +101,9 @@ async def test_get_pois_in_bbox_network_error(httpx_mock):
 
     with patch("src.ingestion.opentripmap.asyncio.sleep", new_callable=AsyncMock):
         client = OpenTripMapClient(api_key="test_api_key")
-        pois = await client.get_pois_in_bbox(lon_min=-3.71, lat_min=40.40, lon_max=-3.67, lat_max=40.43)
+        pois = await client.get_pois_in_bbox(
+            lon_min=-3.71, lat_min=40.40, lon_max=-3.67, lat_max=40.43
+        )
 
     assert pois == []
 
