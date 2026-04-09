@@ -16,6 +16,35 @@ Esta sección describe la arquitectura técnica del Smart Tourism Engine, los m�
 - **api/**: Definición de rutas FastAPI, esquemas y lógica de servidor.
 - **ui/**: Implementación de la interfaz de usuario con Streamlit.
 
+## Persistencia: SQLite vs Qdrant
+
+El sistema utiliza dos mecanismos de persistencia con responsabilidades distintas y complementarias:
+
+### SQLite — Metadatos del catálogo
+
+SQLite (via SQLAlchemy) almacena el catálogo estructurado de destinos turísticos en `data/processed/destinations.db`. Se eligió SQLite porque:
+
+- **Sin servidor**: no requiere infraestructura adicional; el archivo `.db` es portátil y reproducible.
+- **Datos estructurados**: los metadatos (nombre, país, región, coordenadas, tags, fuente) encajan naturalmente en un esquema relacional con tipado estático.
+- **Upsert nativo**: SQLite soporta `INSERT OR REPLACE` (expuesto via `on_conflict_do_update` en SQLAlchemy), lo que simplifica la ingesta incremental de destinos.
+- **Consultas SQL**: filtrado por país, región o fuente se expresa de forma directa y eficiente sin necesidad de un ORM pesado.
+- **Escala suficiente**: para un corpus de miles a decenas de miles de destinos, SQLite ofrece rendimiento adecuado sin operaciones de mantenimiento.
+
+La tabla `destinations` en `src/ingestion/store.py` espeja el modelo Pydantic `Destination`, con listas (tags, image_urls) serializadas como JSON en columnas `TEXT`.
+
+### Qdrant — Índice vectorial semántico
+
+Qdrant gestiona los embeddings de texto (y en fases posteriores, imágenes CLIP). Se eligió Qdrant porque:
+
+- **Búsqueda por similitud**: la recuperación semántica requiere distancias en espacios de alta dimensión (cosine, dot product), operación no soportada eficientemente por SQL.
+- **ANN indexing**: Qdrant implementa HNSW para búsqueda aproximada de vecinos más cercanos con latencia sub-segundo.
+- **Filtrado combinado**: permite combinar filtros de metadatos (país, región) con búsqueda vectorial en una sola consulta, optimizando la fase de recuperación híbrida.
+- **Persistencia propia**: los vectores y payloads se almacenan en `data/processed/qdrant/`, desacoplados del catálogo relacional.
+
+### Relación entre ambos
+
+El `id` de cada destino es la clave primaria en SQLite y el `id` del punto en Qdrant, permitiendo joins lógicos en la capa de recuperación: Qdrant retorna IDs relevantes y SQLite provee los metadatos completos para la respuesta final.
+
 ## Gestión de Datos (data/)
 
 - **raw/**: Datos crudos obtenidos de los crawlers y scrapers (ignorado por Git).
