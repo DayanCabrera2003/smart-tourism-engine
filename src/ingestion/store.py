@@ -9,8 +9,12 @@ from sqlalchemy.orm import sessionmaker
 import json
 from datetime import datetime
 
-# Configuración básica
-DATABASE_URL = "sqlite:///data/processed/destinations.db"
+from src.config import settings
+
+# Derivar ruta desde settings para que DATA_DIR sea respetado
+_db_path = settings.DATA_DIR / "processed" / "destinations.db"
+_db_path.parent.mkdir(parents=True, exist_ok=True)
+DATABASE_URL = f"sqlite:///{_db_path}"
 engine = create_engine(DATABASE_URL, echo=False, future=True)
 metadata = MetaData()
 
