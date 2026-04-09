@@ -1,4 +1,5 @@
 import pytest
+
 from src.indexing.stemmer import stem, stem_token
 
 
@@ -43,7 +44,7 @@ def test_stem_single_token():
 
 
 def test_stem_invalid_language():
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         stem_token("hola", language="klingon")
 
 
