@@ -75,3 +75,43 @@ Tras la ejecución del pipeline de ingestión sobre Wikivoyage para destinos en 
 | **Fuente dominante** | Wikivoyage |
 
 Estas estadísticas se generan mediante el script `scripts/stats.py`.
+
+---
+
+## 2. Fusión y deduplicación de fuentes
+
+A partir de la tarea T018, el sistema soporta la integración de múltiples fuentes de datos (ej. Wikivoyage, OpenTripMap). Para evitar duplicados, se implementa una deduplicación basada en nombre y proximidad geográfica:
+
+- **Criterio de duplicado**: Dos destinos se consideran duplicados si su nombre coincide (ignorando mayúsculas/minúsculas y espacios) y la distancia Haversine entre sus coordenadas es menor a 1 km.
+- **Fusión de campos**: Al fusionar, se unen las listas de etiquetas (`tags`) e imágenes (`image_urls`). Se añade un campo `sources` (lista) con los nombres de todas las fuentes que aportaron información sobre ese destino.
+
+### Algoritmo de deduplicación
+
+```python
+from src.ingestion.merger import merge_destinations
+
+# Uso:
+# merged = merge_destinations([wikivoyage_list, opentripmap_list])
+```
+
+La función `merge_destinations` recorre todas las listas de destinos, compara cada destino con los ya fusionados y aplica la deduplicación según el criterio anterior. Si encuentra un duplicado, fusiona los campos relevantes; si no, lo añade como nuevo.
+
+#### Fórmula de distancia Haversine
+
+$$
+d = 2R \arcsin\left( \sqrt{ \sin^2\left(\frac{\varphi_2-\varphi_1}{2}\right) + \cos\varphi_1 \cos\varphi_2 \sin^2\left(\frac{\lambda_2-\lambda_1}{2}\right) } \right)
+$$
+
+Donde $R$ es el radio de la Tierra (6371 km), $(\varphi, \lambda)$ son latitud y longitud en radianes.
+
+#### Ejemplo de uso
+
+```python
+from src.ingestion.models import Destination
+from src.ingestion.merger import merge_destinations
+
+# Suponiendo que tienes dos listas de destinos de diferentes fuentes:
+merged = merge_destinations([wikivoyage_destinations, opentripmap_destinations])
+```
+
+---
