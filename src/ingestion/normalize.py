@@ -7,19 +7,22 @@ __all__ = [
     "normalize_text",
 ]
 
+import html
 import re
 import unicodedata
 
 
 def clean_html(text: str) -> str:
     """
-    Elimina etiquetas HTML de una cadena de texto.
+    Elimina etiquetas HTML y decodifica entidades HTML de una cadena de texto.
     """
     if not text:
         return ""
-    # Regex para etiquetas HTML
+    # Eliminar etiquetas HTML
     clean_re = re.compile("<.*?>")
-    return re.sub(clean_re, "", text)
+    text = re.sub(clean_re, "", text)
+    # Decodificar entidades HTML (&amp; -> &, &nbsp; -> espacio, etc.)
+    return html.unescape(text)
 
 
 def lowercase(text: str) -> str:

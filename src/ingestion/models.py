@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -22,7 +22,7 @@ class Destination(BaseModel):
         None, description="Coordenadas geográficas (latitud, longitud)"
     )
     source: str = Field(..., description="Fuente de donde se obtuvo la información")
-    fetched_at: datetime = Field(default_factory=datetime.now, description="Fecha de adquisición")
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Fecha de adquisición")
 
     model_config = {
         "json_schema_extra": {

@@ -1,6 +1,7 @@
 import json
 import re
-from datetime import datetime
+import unicodedata
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +15,9 @@ class WikivoyageParser:
     en objetos del modelo Destination.
     """
 
+    # Caracteres no permitidos en IDs (mantener solo letras, dígitos y guiones)
+    _id_unsafe_re = re.compile(r"[^a-z0-9-]")
+
     def __init__(self, default_country: str = "Spain"):
         self.default_country = default_country
         # Regex para extraer coordenadas {{Geo|lat|long|...}} o {{geo|...}}
@@ -23,6 +27,19 @@ class WikivoyageParser:
         self.link_re = re.compile(r"\[\[(?:[^|\]]*\|)?([^\]]+)\]\]")
         # Regex para plantillas {{...}}
         self.template_re = re.compile(r"{{.*?}}", re.DOTALL)
+
+    def _make_id(self, title: str) -> str:
+        """Genera un ID seguro para URLs y sistemas de archivos a partir del título."""
+        # Eliminar diacríticos (ñ→n, á→a, etc.)
+        nfd = unicodedata.normalize("NFD", title.lower())
+        ascii_title = "".join(c for c in nfd if unicodedata.category(c) != "Mn")
+        # Espacios y paréntesis → guiones
+        slug = ascii_title.replace(" ", "-").replace("(", "").replace(")", "")
+        # Eliminar cualquier carácter restante no seguro
+        slug = self._id_unsafe_re.sub("", slug)
+        # Colapsar guiones múltiples
+        slug = re.sub(r"-{2,}", "-", slug).strip("-")
+        return f"wikivoyage-{slug}"
 
     def clean_text(self, text: str) -> str:
         """Limpia el wikitext para obtener una descripción más legible."""
@@ -60,14 +77,14 @@ class WikivoyageParser:
 
             # Construir objeto Destination
             dest = Destination(
-                id=f"wikivoyage-{title.lower().replace(' ', '-')}",
+                id=self._make_id(title),
                 name=title,
                 country=self.default_country,  # Ahora configurable
                 description=self.clean_text(content),
                 coordinates=coords,
                 tags=["city", "wikivoyage"],  # Tags base
                 source="wikivoyage",
-                fetched_at=datetime.now()
+                fetched_at=datetime.now(timezone.utc),
             )
             return dest
 
