@@ -97,4 +97,40 @@ eb = ExtendedBoolean(p=2.0)
 sim = eb.or_norm([0.6, 0.8])  # → 0.7071
 ```
 
+### AND p-norm (T034)
+
+Para una consulta AND con $n$ términos y pesos $w_1, w_2, \ldots, w_n$:
+
+$$\text{sim}_{AND}(d, q) = 1 - \left( \frac{\sum_{i=1}^{n} (1 - w_i)^{\,p}}{n} \right)^{1/p}$$
+
+La fórmula penaliza los términos ausentes ($(1 - w_i)$ alto) y es el complemento simétrico del OR.
+
+**Propiedades clave:**
+
+| Valor de $p$ | Comportamiento |
+|---|---|
+| $p = 1$ | Media aritmética — comportamiento vectorial puro |
+| $p = 2$ | Norma euclidiana complementada — recomendado para turismo |
+| $p \to \infty$ | $\min(w_i)$ — Booleano puro: todos los términos deben ocurrir |
+
+**Relación entre AND y OR:** para los mismos pesos y $p$, siempre se cumple $\text{sim}_{AND} \leq \text{sim}_{OR}$. El AND es más exigente.
+
+**Ejemplo numérico** (Salton et al., 1983):
+
+Consulta: `"playa AND montaña"` con $p=2$.  
+Pesos en el documento: $w_{\text{playa}} = 0.6$, $w_{\text{montaña}} = 0.8$.
+
+$$\text{sim}_{AND} = 1 - \left( \frac{(1-0.6)^2 + (1-0.8)^2}{2} \right)^{1/2} = 1 - \left( \frac{0.16 + 0.04}{2} \right)^{1/2} = 1 - \sqrt{0.1} \approx 0.684$$
+
+El documento puntúa $0.684$: el término "montaña" está bien representado ($w=0.8$) pero "playa" sólo a medias ($w=0.6$), lo que penaliza el AND respecto al OR ($0.707$).
+
+**Implementación:**
+
+```python
+from src.retrieval.extended_boolean import ExtendedBoolean
+
+eb = ExtendedBoolean(p=2.0)
+sim = eb.and_norm([0.6, 0.8])  # → 0.6838
+```
+
 Las pruebas unitarias asociadas se encuentran en `tests/test_extended_boolean.py`.

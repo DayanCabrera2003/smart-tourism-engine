@@ -62,6 +62,27 @@ class ExtendedBoolean:
             return 0.0
         return (sum(w ** self.p for w in weights) / n) ** (1.0 / self.p)
 
+    def and_norm(self, weights: Sequence[float]) -> float:
+        """Similitud AND p-norm (Salton, Fox & Wu, 1983, ecuación 5).
+
+        Fórmula:
+            sim_and = 1 - ( Σ (1 - wᵢ)ᵖ / n ) ^ (1/p)
+
+        Con p=1 se obtiene la media aritmética (comportamiento vectorial).
+        Con p→∞ converge al mínimo (Booleano puro: todos los términos deben ocurrir).
+
+        Args:
+            weights: Pesos TF-IDF normalizados de los términos de la consulta
+                     en el documento evaluado. Cada peso debe estar en [0, 1].
+
+        Returns:
+            Similitud en [0, 1]. Devuelve 0.0 si la lista está vacía.
+        """
+        n = len(weights)
+        if n == 0:
+            return 0.0
+        return 1.0 - (sum((1.0 - w) ** self.p for w in weights) / n) ** (1.0 / self.p)
+
     def score(self, query: str, doc_id: str) -> float:
         """
         Calcula la similitud p-norm entre una consulta y un documento.
