@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 import sys
 from pathlib import Path
@@ -93,6 +94,7 @@ INITIAL_DESTINATIONS = [
 
 WIKIVOYAGE_API_URL = "https://en.wikivoyage.org/w/api.php"
 USER_AGENT = "SmartTourismEngine/0.1 (dayancc@example.com)"
+REQUEST_DELAY_SECONDS = 1.0  # Delay entre requests para respetar el servidor
 
 # Mapeo título → país para asignar country correcto en el pipeline
 COUNTRY_MAP = {
@@ -229,6 +231,8 @@ def download_pages(pages: list[str], output_dir: Path):
                 
             except Exception as e:
                 logger.error(f"Error al descargar {page_title}: {e}")
+            finally:
+                time.sleep(REQUEST_DELAY_SECONDS)
 
 
 def main():

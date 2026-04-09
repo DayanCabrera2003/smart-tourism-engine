@@ -62,7 +62,7 @@ def upsert_destination(dest) -> None:
     stmt = sqlite_insert(destinations).values(**values)
     stmt = stmt.on_conflict_do_update(
         index_elements=[destinations.c.id],
-        set_=values
+        set_={k: v for k, v in values.items() if k != "id"},
     )
     with Session() as session:
         session.execute(stmt)
