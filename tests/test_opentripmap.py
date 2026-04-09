@@ -1,5 +1,7 @@
+
 import httpx
 import pytest
+from httpx import Request, Response
 
 from src.ingestion.opentripmap import OpenTripMapClient
 
