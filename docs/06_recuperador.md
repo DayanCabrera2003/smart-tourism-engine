@@ -248,3 +248,38 @@ results = eb.search("playa AND tranquilo OR montaña", idx, top_k=10)
 ```
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_extended_boolean.py`.
+
+---
+
+## Tests de integración (T038)
+
+`tests/test_retrieval.py` verifica el pipeline completo sobre el índice real (`data/processed/index.pkl`, 206 documentos Wikivoyage).
+
+### Queries verificadas
+
+| Query | Destino esperado en top-5 | Justificación |
+|-------|--------------------------|---------------|
+| `"beach"` | `wikivoyage-varadero` (top-1) | Varadero es el destino de playa con mayor densidad del término |
+| `"tokyo"` | `wikivoyage-tokyo` (score > 0.5) | Coincidencia directa de nombre propio |
+| `"temple AND japan"` | `wikivoyage-kyoto` | Capital cultural de Japón; alta densidad de templos |
+| `"beach OR mountain"` | `wikivoyage-varadero` | Mayor peso de "beach" en la colección |
+| `"museum AND art"` | `wikivoyage-munich` | Alta concentración de museos de arte en Munich |
+
+### Cómo ejecutar los tests
+
+```bash
+# Solo tests de integración del recuperador
+pytest tests/test_retrieval.py -v
+
+# Suite completa
+pytest -v
+
+# Si el índice no existe, los tests se saltan automáticamente
+# → SKIPPED  Índice no encontrado en data/processed/index.pkl
+```
+
+Para regenerar el índice:
+
+```bash
+python -m src.cli build-index data/raw/destinations.jsonl --output data/processed/index.pkl
+```
