@@ -85,3 +85,51 @@ boolean_query("tourism AND NOT beach", idx)
 Estas limitaciones motivan el uso del **Modelo Booleano Extendido (p-norm)** como modelo principal del sistema (ver `docs/03_modelo_ri.md`).
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_boolean.py`.
+
+---
+
+## Parser de Queries p-norm (T035)
+
+El módulo `src/retrieval/query_parser.py` convierte una consulta textual a un **árbol AST** que el evaluador p-norm (T036) recorre aplicando las fórmulas AND/OR extendidas.
+
+### Gramática
+
+```
+expr      → and_expr (OR and_expr)*
+and_expr  → TERM (AND TERM)*
+TERM      → cualquier token que no sea AND / OR
+```
+
+**Precedencia:** AND se evalúa antes que OR (igual que en álgebra booleana estándar).  
+**Preprocesamiento:** los términos pasan por el mismo pipeline que los documentos indexados (tokenize → stopwords → stem), garantizando coherencia con el índice.
+
+### Nodos del AST
+
+| Clase | Descripción | Atributos |
+|-------|-------------|-----------|
+| `TermNode` | Hoja: término ya preprocesado | `term: str` |
+| `AndNode` | Nodo AND p-norm | `children: list[Node]` |
+| `OrNode` | Nodo OR p-norm | `children: list[Node]` |
+
+### API pública
+
+```python
+from src.retrieval.query_parser import parse_query
+
+node = parse_query("playa AND tranquilo OR montaña")
+# → OrNode(children=[AndNode(children=[TermNode("playa"), TermNode("tranquilo")]),
+#                    TermNode("montaña")])
+```
+
+Lanza `ValueError` si la consulta está vacía o no contiene términos válidos tras el preprocesamiento.
+
+### Ejemplos de árboles generados
+
+| Consulta | AST |
+|----------|-----|
+| `"beach"` | `TermNode("beach")` |
+| `"beach AND tourism"` | `AndNode([TermNode("beach"), TermNode("tourism")])` |
+| `"beach OR mountain"` | `OrNode([TermNode("beach"), TermNode("mountain")])` |
+| `"playa AND tranquilo OR montaña"` | `OrNode([AndNode([TermNode("playa"), TermNode("tranquilo")]), TermNode("montaña")])` |
+
+Las pruebas unitarias asociadas se encuentran en `tests/test_query_parser.py`.
