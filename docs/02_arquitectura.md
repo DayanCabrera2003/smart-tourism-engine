@@ -61,11 +61,39 @@ El `id` de cada destino es la clave primaria en SQLite y el `id` del punto en Qd
 
 La aplicación FastAPI vive en `src/api/main.py` y se arranca con `uvicorn src.api.main:app --reload`.
 
-| Método | Ruta      | Descripción                                           | Respuesta                 |
-|--------|-----------|-------------------------------------------------------|---------------------------|
-| GET    | `/health` | Sonda de disponibilidad del servicio (liveness probe). | `{"status": "ok"}` (200) |
+| Método | Ruta      | Descripción                                                                 | Respuesta                 |
+|--------|-----------|-----------------------------------------------------------------------------|---------------------------|
+| GET    | `/health` | Sonda de disponibilidad del servicio (liveness probe).                      | `{"status": "ok"}` (200)  |
+| POST   | `/search` | Recupera destinos aplicando el Booleano Extendido (p-norm) sobre el índice. | `SearchResponse` (200)    |
 
-Los endpoints de búsqueda (`/search`) y demás se documentan en secciones posteriores a medida que se implementan.
+### `POST /search` (T040)
+
+Delega en `ExtendedBoolean.search` usando el índice invertido persistido en `data/processed/index.pkl`. El índice se carga una sola vez y se comparte vía `Depends(get_index)`, lo que permite inyectarlo en tests con `app.dependency_overrides`.
+
+**Request** (`SearchRequest`):
+
+```json
+{
+  "query": "beach OR mountain",
+  "top_k": 5
+}
+```
+
+- `query` (str, obligatorio): consulta con operadores `AND` / `OR` en mayúsculas.
+- `top_k` (int, 1-100, por defecto 10): número máximo de resultados.
+
+**Response** (`SearchResponse`):
+
+```json
+{
+  "results": [
+    {"id": "wikivoyage-varadero", "score": 0.63},
+    {"id": "wikivoyage-tokyo",    "score": 0.41}
+  ]
+}
+```
+
+La lista viene ordenada de mayor a menor `score` (valor en `[0, 1]`). Si el índice no está disponible en disco, la ruta responde `503`. Los schemas se formalizan en `src/api/schemas.py` como parte de T041.
 
 ## Observabilidad
 
