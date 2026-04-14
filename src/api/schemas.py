@@ -45,6 +45,13 @@ class DestinationResult(BaseModel):
         None,
         description="Descripción completa del destino (T044). La UI la trunca al renderizar.",
     )
+    image_urls: list[str] = Field(
+        default_factory=list,
+        description=(
+            "URLs de imágenes del destino (T045). La UI muestra la primera; "
+            "lista vacía indica que no hay imágenes disponibles."
+        ),
+    )
 
 
 class SearchResponse(BaseModel):

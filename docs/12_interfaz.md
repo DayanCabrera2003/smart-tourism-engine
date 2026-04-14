@@ -4,9 +4,9 @@
 
 La UI vive en [`src/ui/app.py`](../src/ui/app.py) y se construye sobre
 [Streamlit](https://streamlit.io/). El MVP expone un input de texto, un botón
-**Buscar** y, desde T044, una lista de **tarjetas** por resultado. Las
-imágenes (T045) y los sliders para `top_k` y `p` (T047) llegarán en tareas
-siguientes.
+**Buscar** y, desde T044, una lista de **tarjetas** por resultado. Desde T045
+cada tarjeta muestra además la primera imagen disponible del destino. Los
+sliders para `top_k` y `p` (T047) llegarán en tareas siguientes.
 
 ### Arquitectura
 
@@ -82,6 +82,40 @@ muestra el propio `id` como título).
 La decisión de dejar la descripción completa en la respuesta de la API (y
 truncar sólo en render) permite que otros clientes ajusten el límite sin
 cambios en el backend.
+
+## T045 — Imágenes en las tarjetas
+
+Cuando `destinations.db` contiene URLs de imagen para un destino, la API las
+expone en el campo `image_urls` del schema
+[`DestinationResult`](../src/api/schemas.py) y la UI muestra **la primera
+utilizable** en la card, justo debajo de la línea meta y antes de la
+descripción:
+
+```
+┌──────────────────────────────────────────────────┐
+│ ### 1. <name>                          [ score ] │
+│ :earth_americas: <country> · `<id>`              │
+│ ┌──────────────────────────────────────────────┐ │
+│ │                  <imagen>                    │ │
+│ └──────────────────────────────────────────────┘ │
+│ <descripción truncada a ~220 caracteres…>        │
+└──────────────────────────────────────────────────┘
+```
+
+### Degradación
+
+El helper puro [`pick_cover_image`](../src/ui/app.py) elige la primera URL
+válida de la lista (ignora entradas vacías o no-strings). Si la lista está
+ausente, vacía o todas las URLs son inválidas, la card se renderiza **sin**
+bloque de imagen, manteniendo el layout compacto del MVP. Si `st.image`
+falla al cargar una URL marcada como válida, se captura la excepción y se
+sustituye por un caption :frame_with_picture: `Imagen no disponible.` para
+no tumbar la sesión de Streamlit.
+
+La decisión de elegir una sola imagen (y no una galería) es deliberada para
+el MVP: mantiene la densidad de la lista de resultados y evita cargas
+pesadas cuando el top_k es alto. La búsqueda multimodal (T081+) reutilizará
+el mismo campo `image_urls` más adelante.
 
 ### Manejo de errores
 

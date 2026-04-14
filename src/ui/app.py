@@ -1,9 +1,11 @@
-"""T043/T044 — Streamlit UI para consultar el endpoint ``POST /search``.
+"""T043/T044/T045 — Streamlit UI para consultar el endpoint ``POST /search``.
 
 - T043: input de texto, botón de búsqueda y llamada HTTP a la API.
 - T044: cada resultado se renderiza como una tarjeta con nombre, país,
-  descripción truncada y score. Las imágenes (T045) y los sliders (T047)
-  llegarán en tareas siguientes.
+  descripción truncada y score.
+- T045: cuando el destino incluye ``image_urls``, la tarjeta muestra la
+  primera imagen disponible y degrada con elegancia si la lista está vacía
+  o la URL no es válida. Los sliders (T047) llegarán en tareas siguientes.
 
 La lógica de llamada HTTP y el helper de truncado viven como funciones puras
 para poder testearlos sin necesidad de levantar el runtime de Streamlit.
@@ -19,6 +21,20 @@ from src.api.schemas import DestinationResult, SearchResponse
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
 DESCRIPTION_MAX_CHARS = 220
+
+
+def pick_cover_image(image_urls: list[str] | None) -> str | None:
+    """Devuelve la primera URL utilizable de ``image_urls`` (T045).
+
+    Ignora entradas vacías o no-strings para que la card no intente cargar
+    una imagen rota cuando el corpus tiene URLs inválidas.
+    """
+    if not image_urls:
+        return None
+    for url in image_urls:
+        if isinstance(url, str) and url.strip():
+            return url.strip()
+    return None
 
 
 def truncate_description(text: str | None, max_chars: int = DESCRIPTION_MAX_CHARS) -> str:
@@ -105,6 +121,12 @@ def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no c
             meta_bits.append(f":earth_americas: {hit.country}")
         meta_bits.append(f"`{hit.id}`")
         header.caption(" · ".join(meta_bits))
+        cover = pick_cover_image(hit.image_urls)
+        if cover:
+            try:
+                st.image(cover, use_container_width=True)
+            except Exception:
+                st.caption(":frame_with_picture: Imagen no disponible.")
         description = truncate_description(hit.description)
         if description:
             st.write(description)
