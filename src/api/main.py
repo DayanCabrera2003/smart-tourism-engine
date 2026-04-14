@@ -9,6 +9,8 @@ T044 — Enriquece la respuesta con metadatos (nombre, país, descripción)
        leídos de ``destinations.db`` para alimentar las tarjetas de la UI.
 T045 — Propaga ``image_urls`` (lista de URLs) para que la UI muestre la
        primera imagen disponible en cada tarjeta.
+T047 — Acepta ``p`` en el body y construye el recuperador p-norm por
+       petición, permitiendo a la UI exponer el parámetro en un slider.
 """
 from __future__ import annotations
 
@@ -16,6 +18,7 @@ import json
 import pickle
 from functools import lru_cache
 from pathlib import Path
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -54,9 +57,14 @@ def get_index() -> InvertedIndex:
     return _load_index_from_disk()
 
 
-def get_retriever() -> ExtendedBoolean:
-    """Provee el recuperador p-norm.  Inyectable en tests."""
-    return ExtendedBoolean(p=2.0)
+def get_retriever_factory() -> Callable[[float], ExtendedBoolean]:
+    """Fábrica de recuperadores p-norm parametrizada por ``p`` (T047).
+
+    Devolver una fábrica (en vez de una instancia fija) permite que cada
+    petición use el ``p`` enviado por el cliente sin perder el hook de
+    inyección para los tests.
+    """
+    return lambda p: ExtendedBoolean(p=p)
 
 
 @lru_cache(maxsize=1)
@@ -101,7 +109,9 @@ def health() -> dict[str, str]:
 
 
 IndexDep = Annotated[InvertedIndex, Depends(get_index)]
-RetrieverDep = Annotated[ExtendedBoolean, Depends(get_retriever)]
+RetrieverFactoryDep = Annotated[
+    Callable[[float], ExtendedBoolean], Depends(get_retriever_factory)
+]
 DestinationsDep = Annotated[dict[str, dict[str, object]], Depends(get_destinations)]
 
 
@@ -109,10 +119,11 @@ DestinationsDep = Annotated[dict[str, dict[str, object]], Depends(get_destinatio
 def search(
     request: SearchRequest,
     index: IndexDep,
-    retriever: RetrieverDep,
+    retriever_factory: RetrieverFactoryDep,
     destinations: DestinationsDep,
 ) -> SearchResponse:
     """Busca destinos con el Booleano Extendido (p-norm) y los devuelve rankeados."""
+    retriever = retriever_factory(request.p)
     hits = retriever.search(request.query, index, top_k=request.top_k)
     results: list[DestinationResult] = []
     for doc_id, score in hits:

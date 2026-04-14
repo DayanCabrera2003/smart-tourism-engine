@@ -8,7 +8,7 @@ para no depender del pickle real del proyecto.
 """
 from fastapi.testclient import TestClient
 
-from src.api.main import app, get_destinations, get_index, get_retriever
+from src.api.main import app, get_destinations, get_index, get_retriever_factory
 from src.indexing.inverted_index import InvertedIndex
 from src.retrieval.extended_boolean import ExtendedBoolean
 
@@ -22,10 +22,21 @@ def _build_test_index() -> InvertedIndex:
     return idx
 
 
-def _client(destinations: dict | None = None) -> TestClient:
+def _client(
+    destinations: dict | None = None,
+    captured_p: list[float] | None = None,
+) -> TestClient:
     idx = _build_test_index()
     app.dependency_overrides[get_index] = lambda: idx
-    app.dependency_overrides[get_retriever] = lambda: ExtendedBoolean(p=2.0)
+
+    def _factory() -> "callable":
+        def _make(p: float) -> ExtendedBoolean:
+            if captured_p is not None:
+                captured_p.append(p)
+            return ExtendedBoolean(p=p)
+        return _make
+
+    app.dependency_overrides[get_retriever_factory] = _factory
     app.dependency_overrides[get_destinations] = lambda: destinations or {}
     return TestClient(app)
 
@@ -96,6 +107,33 @@ def test_search_enriches_results_with_metadata():
     assert top["name"] == "Playa del Carmen"
     assert top["country"] == "México"
     assert "arrecife" in top["description"]
+
+
+def test_search_accepts_custom_p():
+    """T047 — El body acepta ``p`` y el endpoint lo usa al construir el recuperador."""
+    captured: list[float] = []
+    client = _client(captured_p=captured)
+    response = client.post("/search", json={"query": "beach", "top_k": 3, "p": 4.5})
+    assert response.status_code == 200
+    assert captured == [4.5]
+
+
+def test_search_default_p_is_two():
+    """T047 — Sin ``p`` explícito se usa p=2.0 (valor por defecto del schema)."""
+    captured: list[float] = []
+    client = _client(captured_p=captured)
+    response = client.post("/search", json={"query": "beach"})
+    assert response.status_code == 200
+    assert captured == [2.0]
+
+
+def test_search_rejects_p_out_of_range():
+    """T047 — ``p`` fuera de [1, 10] debe devolver 422."""
+    client = _client()
+    too_small = client.post("/search", json={"query": "beach", "p": 0.5})
+    too_big = client.post("/search", json={"query": "beach", "p": 20})
+    assert too_small.status_code == 422
+    assert too_big.status_code == 422
 
 
 def test_search_returns_null_metadata_when_absent():

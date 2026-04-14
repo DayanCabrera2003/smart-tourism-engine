@@ -1,11 +1,13 @@
-"""T043/T044/T045 — Streamlit UI para consultar el endpoint ``POST /search``.
+"""T043/T044/T045/T047 — Streamlit UI para consultar el endpoint ``POST /search``.
 
 - T043: input de texto, botón de búsqueda y llamada HTTP a la API.
 - T044: cada resultado se renderiza como una tarjeta con nombre, país,
   descripción truncada y score.
 - T045: cuando el destino incluye ``image_urls``, la tarjeta muestra la
   primera imagen disponible y degrada con elegancia si la lista está vacía
-  o la URL no es válida. Los sliders (T047) llegarán en tareas siguientes.
+  o la URL no es válida.
+- T047: el sidebar expone sliders para ``top_k`` (1-50) y ``p`` (1-10) del
+  Booleano Extendido, que se envían al backend en cada búsqueda.
 
 La lógica de llamada HTTP y el helper de truncado viven como funciones puras
 para poder testearlos sin necesidad de levantar el runtime de Streamlit.
@@ -21,6 +23,13 @@ from src.api.schemas import DestinationResult, SearchResponse
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
 DESCRIPTION_MAX_CHARS = 220
+
+DEFAULT_TOP_K = 10
+TOP_K_MIN = 1
+TOP_K_MAX = 50
+DEFAULT_P = 2.0
+P_MIN = 1.0
+P_MAX = 10.0
 
 
 def pick_cover_image(image_urls: list[str] | None) -> str | None:
@@ -54,16 +63,18 @@ def truncate_description(text: str | None, max_chars: int = DESCRIPTION_MAX_CHAR
 def search_destinations(
     query: str,
     *,
-    top_k: int = 10,
+    top_k: int = DEFAULT_TOP_K,
+    p: float = DEFAULT_P,
     api_url: str = API_URL,
     client: httpx.Client | None = None,
 ) -> list[DestinationResult]:
     """Llama a ``POST {api_url}/search`` y devuelve los destinos rankeados.
 
     El parámetro ``client`` permite inyectar un ``httpx.Client`` en tests
-    (p.ej. uno montado sobre la app FastAPI).
+    (p.ej. uno montado sobre la app FastAPI). ``p`` es la norma-p del
+    Booleano Extendido (T047).
     """
-    payload = {"query": query, "top_k": top_k}
+    payload = {"query": query, "top_k": top_k, "p": p}
     owns_client = client is None
     http = client or httpx.Client(base_url=api_url, timeout=10.0)
     try:
@@ -83,6 +94,28 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
     st.title("Smart Tourism Engine")
     st.caption("MVP — Booleano Extendido (p-norm)")
 
+    with st.sidebar:
+        st.header("Parámetros")
+        top_k = st.slider(
+            "top_k",
+            min_value=TOP_K_MIN,
+            max_value=TOP_K_MAX,
+            value=DEFAULT_TOP_K,
+            step=1,
+            help="Número máximo de destinos a devolver.",
+        )
+        p = st.slider(
+            "p (norma)",
+            min_value=P_MIN,
+            max_value=P_MAX,
+            value=DEFAULT_P,
+            step=0.5,
+            help=(
+                "Norma-p del Booleano Extendido. p=1 → vectorial (AND/OR "
+                "blandos); p→∞ → Booleano puro (AND/OR estrictos)."
+            ),
+        )
+
     query = st.text_input(
         "Consulta",
         placeholder="playa AND España",
@@ -95,7 +128,7 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
             st.warning("Escribe una consulta antes de buscar.")
             return
         try:
-            results = search_destinations(query)
+            results = search_destinations(query, top_k=top_k, p=p)
         except httpx.HTTPError as exc:
             st.error(f"Error al consultar la API ({API_URL}): {exc}")
             return

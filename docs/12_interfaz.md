@@ -5,8 +5,9 @@
 La UI vive en [`src/ui/app.py`](../src/ui/app.py) y se construye sobre
 [Streamlit](https://streamlit.io/). El MVP expone un input de texto, un botón
 **Buscar** y, desde T044, una lista de **tarjetas** por resultado. Desde T045
-cada tarjeta muestra además la primera imagen disponible del destino. Los
-sliders para `top_k` y `p` (T047) llegarán en tareas siguientes.
+cada tarjeta muestra además la primera imagen disponible del destino. Desde
+T047 un sidebar con sliders permite ajustar `top_k` y `p` antes de cada
+búsqueda.
 
 ### Arquitectura
 

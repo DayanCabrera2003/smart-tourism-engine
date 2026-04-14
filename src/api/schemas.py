@@ -23,6 +23,16 @@ class SearchRequest(BaseModel):
         le=100,
         description="Número máximo de resultados a devolver.",
     )
+    p: float = Field(
+        2.0,
+        ge=1.0,
+        le=10.0,
+        description=(
+            "Parámetro de la norma-p del Booleano Extendido (T047). "
+            "p=1 → vectorial (operadores blandos); p→∞ → Booleano puro "
+            "(operadores estrictos). Valores típicos para turismo: 2-5."
+        ),
+    )
 
 
 class DestinationResult(BaseModel):
