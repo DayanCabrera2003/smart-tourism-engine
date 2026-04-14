@@ -7,6 +7,8 @@ T042 — Registra el middleware de logging y los handlers de errores unificados
        definidos en ``src/api/middleware.py``.
 T044 — Enriquece la respuesta con metadatos (nombre, país, descripción)
        leídos de ``destinations.db`` para alimentar las tarjetas de la UI.
+T045 — Propaga ``image_urls`` (lista de URLs) para que la UI muestre la
+       primera imagen disponible en cada tarjeta.
 """
 from __future__ import annotations
 
@@ -122,6 +124,7 @@ def search(
                 name=meta.get("name"),
                 country=meta.get("country"),
                 description=meta.get("description"),
+                image_urls=list(meta.get("image_urls") or []),
             )
         )
     return SearchResponse(results=results)

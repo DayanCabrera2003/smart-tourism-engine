@@ -16,7 +16,7 @@ from src.api.main import app, get_destinations, get_index, get_retriever
 from src.api.schemas import DestinationResult
 from src.indexing.inverted_index import InvertedIndex
 from src.retrieval.extended_boolean import ExtendedBoolean
-from src.ui.app import search_destinations, truncate_description
+from src.ui.app import pick_cover_image, search_destinations, truncate_description
 
 
 def _build_index() -> InvertedIndex:
@@ -37,8 +37,14 @@ def api_client() -> TestClient:
             "name": "Playa Azul",
             "country": "México",
             "description": "Arena blanca y mar tibio durante todo el año.",
+            "image_urls": ["https://example.com/playa-azul.jpg"],
+        },
+        "doc-mountain": {
+            "name": "Pico Nevado",
+            "country": "Chile",
+            "description": "Rutas de montaña con nieve eterna.",
             "image_urls": [],
-        }
+        },
     }
     with TestClient(app) as client:
         yield client
@@ -69,6 +75,29 @@ def test_search_destinations_propagates_metadata(api_client: TestClient) -> None
     assert top.country == "México"
     assert top.description is not None
     assert "Arena blanca" in top.description
+
+
+def test_search_destinations_propagates_image_urls(api_client: TestClient) -> None:
+    """T045 — La UI recibe ``image_urls`` y degrada a lista vacía si faltan."""
+    results = search_destinations("beach OR mountain", top_k=5, client=api_client)
+    beach = next(r for r in results if r.id == "doc-beach")
+    mountain = next(r for r in results if r.id == "doc-mountain")
+    assert beach.image_urls == ["https://example.com/playa-azul.jpg"]
+    assert mountain.image_urls == []
+
+
+def test_pick_cover_image_returns_first_valid_url() -> None:
+    assert pick_cover_image(["https://a.jpg", "https://b.jpg"]) == "https://a.jpg"
+
+
+def test_pick_cover_image_skips_empty_entries() -> None:
+    assert pick_cover_image(["", "   ", "https://real.jpg"]) == "https://real.jpg"
+
+
+def test_pick_cover_image_handles_missing_or_empty() -> None:
+    assert pick_cover_image(None) is None
+    assert pick_cover_image([]) is None
+    assert pick_cover_image(["", "   "]) is None
 
 
 def test_truncate_description_respects_limit() -> None:
