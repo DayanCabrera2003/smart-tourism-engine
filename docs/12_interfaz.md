@@ -158,3 +158,76 @@ se refleja en el ranking inmediatamente sin reiniciar la API.
 - Si la API responde con un error HTTP (p.ej. `503` porque el índice aún no
   está construido), la UI captura la excepción de `httpx` y la muestra en un
   bloque de error, sin tumbar la sesión de Streamlit.
+
+## T048 — Demo Corte 1 (end-to-end)
+
+Esta sección describe el flujo de demo que cierra el **Corte 1**: levantar
+el stack con Docker Compose, abrir la UI en el navegador y ejecutar una
+búsqueda de ejemplo (`playa España`) que recorre toda la pila — UI →
+FastAPI → recuperador Booleano Extendido → índice invertido → metadatos
+SQLite — y devuelve tarjetas renderizadas en Streamlit.
+
+### Prerrequisitos
+
+Antes de la demo, los datos procesados deben existir en `data/processed/`:
+
+```bash
+# Una sola vez (o cada vez que cambie el corpus):
+python -m src.cli ingest wikivoyage   # genera destinations.jsonl y .db
+python -m src.cli build-index         # genera index.pkl
+```
+
+Esto produce 206 destinos (Wikivoyage España) y un índice invertido con
+~4 100 términos. El compose monta `./data` como volumen, así que los
+artefactos quedan disponibles para los contenedores `app` y `ui`.
+
+### Pasos de la demo
+
+1. **Levantar el stack**:
+
+   ```bash
+   docker compose up --build
+   ```
+
+   Espera a ver `Uvicorn running on 0.0.0.0:8000` (servicio `app`) y
+   `You can now view your Streamlit app` (servicio `ui`).
+
+2. **Abrir la UI** en [http://localhost:8501](http://localhost:8501).
+
+3. **Ajustar el sidebar** (opcional): dejar `top_k = 10` y `p = 2.0` para
+   reproducir el comportamiento por defecto del Booleano Extendido.
+
+4. **Buscar `playa España`** en el input principal y pulsar **Buscar**.
+
+5. **Resultado esperado**: una lista de tarjetas ordenadas por `score`
+   descendente, encabezadas por *Santa Cruz de Tenerife* (`score ≈ 0.06`
+   con `p = 2`), cada una con su `name`, `country`, `id` monoespaciado y
+   descripción truncada.
+
+### Verificación rápida sin UI
+
+Para chequear el backend de forma aislada (útil en CI o smoke tests):
+
+```bash
+curl -s -X POST http://localhost:8000/search \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"playa AND España","top_k":5,"p":2.0}' | jq '.results[0]'
+```
+
+La respuesta incluye `id`, `score`, `name`, `country`, `description` y
+`image_urls`. Un `200` con al menos un resultado confirma que el índice
+está cargado y que el enriquecimiento con SQLite funciona.
+
+### Sobre las imágenes
+
+El corpus actual de Wikivoyage-España se ingesta sin URLs de imagen (el
+extractor de imágenes está pendiente de los pipelines de Wikidata/Commons
+que aterrizarán en el Corte 2). En consecuencia, las tarjetas se
+renderizan **sin** bloque de imagen aplicando la degradación descrita en
+T045 — es el mismo *code path* que se ejercitará cuando lleguen URLs
+reales, así que la demo valida tanto el camino feliz como el de
+fallback.
+
+> **Hito**: con esta demo reproducible queda cerrado el **Corte 1**
+> (T001 – T048): ingestión + indexación + recuperador Booleano Extendido
+> + API + UI Streamlit en Docker Compose.
