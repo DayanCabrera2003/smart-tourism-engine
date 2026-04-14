@@ -86,11 +86,19 @@ El despliegue completo se gestiona con `docker-compose.yml`, que orquestra los s
 
 ```mermaid
 graph TD
-    User([Usuario]) --> App[Servicio: app]
+    User([Usuario]) --> UI[Servicio: ui - Streamlit 8501]
+    UI --> App[Servicio: app - FastAPI 8000]
     App --> Qdrant[Servicio: qdrant]
     App --> SQLite[(Persistencia: SQLite)]
     Qdrant --> VolQ[(Volumen: qdrant_storage)]
 ```
+
+- **`app`**: expone la API FastAPI en `:8000`. Arranca con
+  `uvicorn src.api.main:app`.
+- **`ui`**: levanta la UI de Streamlit (T046) en `:8501` y consume la API vía
+  `SMART_TOURISM_API_URL=http://app:8000`. Tras `docker compose up` la
+  interfaz queda disponible en `http://localhost:8501`.
+- **`qdrant`**: base vectorial, compartida por `app`.
 
 ### Comandos de gestión
 

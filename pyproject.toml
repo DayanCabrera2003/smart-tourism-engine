@@ -17,6 +17,7 @@ dependencies = [
     "typer",
     "httpx",
     "nltk",
+    "streamlit",
 ]
 
 [project.optional-dependencies]

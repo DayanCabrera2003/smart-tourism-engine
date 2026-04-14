@@ -28,7 +28,33 @@ services:
       - ./data:/app/data
     ports:
       - "8000:8000"
+    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    networks:
+      - sri-network
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: smart-tourism-ui
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      # La UI consume la API por el nombre del servicio en la red de Docker
+      - SMART_TOURISM_API_URL=http://app:8000
+    ports:
       - "8501:8501"
+    command:
+      [
+        "streamlit",
+        "run",
+        "src/ui/app.py",
+        "--server.port=8501",
+        "--server.address=0.0.0.0",
+        "--server.headless=true",
+        "--browser.gatherUsageStats=false",
+      ]
     networks:
       - sri-network
 
