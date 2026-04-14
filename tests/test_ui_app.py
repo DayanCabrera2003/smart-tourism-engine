@@ -12,7 +12,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from src.api.main import app, get_destinations, get_index, get_retriever
+from src.api.main import app, get_destinations, get_index, get_retriever_factory
 from src.api.schemas import DestinationResult
 from src.indexing.inverted_index import InvertedIndex
 from src.retrieval.extended_boolean import ExtendedBoolean
@@ -31,7 +31,7 @@ def _build_index() -> InvertedIndex:
 def api_client() -> TestClient:
     idx = _build_index()
     app.dependency_overrides[get_index] = lambda: idx
-    app.dependency_overrides[get_retriever] = lambda: ExtendedBoolean(p=2.0)
+    app.dependency_overrides[get_retriever_factory] = lambda: lambda p: ExtendedBoolean(p=p)
     app.dependency_overrides[get_destinations] = lambda: {
         "doc-beach": {
             "name": "Playa Azul",
@@ -86,6 +86,22 @@ def test_search_destinations_propagates_image_urls(api_client: TestClient) -> No
     assert mountain.image_urls == []
 
 
+def test_search_destinations_forwards_p_parameter() -> None:
+    """T047 — ``search_destinations`` envía ``p`` en el body a la API."""
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json as _json
+        captured.update(_json.loads(request.content))
+        return httpx.Response(200, json={"results": []})
+
+    transport = httpx.MockTransport(handler)
+    with httpx.Client(base_url="http://test", transport=transport) as client:
+        search_destinations("beach", top_k=7, p=3.5, client=client)
+
+    assert captured == {"query": "beach", "top_k": 7, "p": 3.5}
+
+
 def test_pick_cover_image_returns_first_valid_url() -> None:
     assert pick_cover_image(["https://a.jpg", "https://b.jpg"]) == "https://a.jpg"
 
@@ -118,7 +134,7 @@ def test_search_destinations_raises_on_http_error() -> None:
         raise HTTPException(status_code=503, detail="index unavailable")
 
     app.dependency_overrides[get_index] = _fail
-    app.dependency_overrides[get_retriever] = lambda: ExtendedBoolean(p=2.0)
+    app.dependency_overrides[get_retriever_factory] = lambda: lambda p: ExtendedBoolean(p=p)
     app.dependency_overrides[get_destinations] = lambda: {}
 
     try:
