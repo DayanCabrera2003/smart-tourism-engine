@@ -6,6 +6,7 @@ python-dotenv
 typer
 httpx
 streamlit
+qdrant-client
 # Development dependencies
 pytest
 pytest-cov
