@@ -118,6 +118,40 @@ el MVP: mantiene la densidad de la lista de resultados y evita cargas
 pesadas cuando el top_k es alto. La búsqueda multimodal (T081+) reutilizará
 el mismo campo `image_urls` más adelante.
 
+## T047 — Sliders de `top_k` y `p` en el sidebar
+
+El sidebar de Streamlit expone dos sliders que se leen en cada click de
+**Buscar** y se envían al backend dentro del body de `POST /search`:
+
+| Parámetro | Rango       | Default | Efecto |
+|-----------|-------------|---------|--------|
+| `top_k`   | `1` – `50`  | `10`    | Número máximo de destinos rankeados que devuelve la API. Bajar `top_k` acelera la respuesta cuando sólo interesa el podio; subirlo ayuda a explorar la larga cola. |
+| `p`       | `1.0` – `10.0` (paso `0.5`) | `2.0` | Norma-p del Booleano Extendido (Salton, Fox & Wu, 1983). Controla cuán **estrictos** son los operadores `AND`/`OR` de la consulta. |
+
+### Efecto de `p` en los resultados
+
+La norma-p interpola de forma continua entre dos extremos clásicos de RI:
+
+- **`p = 1` — comportamiento vectorial**: `AND` y `OR` colapsan a la media
+  aritmética de los pesos TF-IDF. Los operadores son *blandos*: un documento
+  con un solo término fuerte puede puntuar alto incluso en una consulta
+  `AND`. Útil para *query expansion* y consultas exploratorias donde
+  preferimos recall sobre precisión.
+- **`p → ∞` — comportamiento Booleano puro**: `AND` converge al mínimo de
+  los pesos y `OR` al máximo. Los operadores se vuelven *estrictos*: una
+  consulta `playa AND España` exige que ambos términos aparezcan con peso
+  significativo. Útil para consultas donde todos los términos son
+  obligatorios.
+- **`p ∈ [2, 5]` — zona recomendada para turismo**: equilibrio entre
+  precisión y recall. El valor por defecto (`p = 2`) favorece resultados
+  coherentes sin eliminar destinos que sólo cumplen parcialmente la
+  consulta.
+
+El endpoint construye un `ExtendedBoolean(p=request.p)` por petición a
+través de la fábrica inyectable
+[`get_retriever_factory`](../src/api/main.py), por lo que mover el slider
+se refleja en el ranking inmediatamente sin reiniciar la API.
+
 ### Manejo de errores
 
 - Si la consulta está vacía, la UI muestra un aviso y no llama a la API.

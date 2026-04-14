@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import json
 import pickle
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
-from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
