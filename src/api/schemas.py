@@ -35,6 +35,16 @@ class DestinationResult(BaseModel):
         le=1.0,
         description="Score del Booleano Extendido, en el rango [0, 1].",
     )
+    name: str | None = Field(
+        None, description="Nombre del destino (T044). Ausente si no hay metadatos."
+    )
+    country: str | None = Field(
+        None, description="País del destino (T044). Ausente si no hay metadatos."
+    )
+    description: str | None = Field(
+        None,
+        description="Descripción completa del destino (T044). La UI la trunca al renderizar.",
+    )
 
 
 class SearchResponse(BaseModel):

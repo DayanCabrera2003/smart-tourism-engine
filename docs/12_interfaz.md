@@ -2,11 +2,10 @@
 
 ## T043 — Streamlit MVP
 
-La UI mínima vive en [`src/ui/app.py`](../src/ui/app.py) y se construye sobre
-[Streamlit](https://streamlit.io/). En este corte el alcance es deliberadamente
-reducido: un input de texto, un botón **Buscar** y una lista plana de
-resultados (identificador del destino y score). Las tarjetas visuales (T044),
-las imágenes (T045) y los sliders para `top_k` y `p` (T047) llegarán en tareas
+La UI vive en [`src/ui/app.py`](../src/ui/app.py) y se construye sobre
+[Streamlit](https://streamlit.io/). El MVP expone un input de texto, un botón
+**Buscar** y, desde T044, una lista de **tarjetas** por resultado. Las
+imágenes (T045) y los sliders para `top_k` y `p` (T047) llegarán en tareas
 siguientes.
 
 ### Arquitectura
@@ -49,6 +48,40 @@ La aplicación queda disponible en `http://localhost:8501`.
    `/search`.
 3. Los resultados se muestran como una lista numerada `id — score`, ordenados
    de mayor a menor score tal y como los devuelve el Booleano Extendido.
+
+## T044 — Tarjetas de destino
+
+Desde T044 cada resultado se renderiza como una *card* en lugar de una línea
+plana. La API acompaña cada destino con `name`, `country` y `description`
+leídos de `destinations.db`; los tres campos son opcionales en el schema
+[`DestinationResult`](../src/api/schemas.py) para no romper clientes previos y
+para degradar con elegancia si un `id` no tiene metadatos (fallback: se
+muestra el propio `id` como título).
+
+### Anatomía de la tarjeta
+
+```
+┌──────────────────────────────────────────────────┐
+│ ### 1. <name>                          [ score ] │
+│ :earth_americas: <country> · `<id>`              │
+│                                                   │
+│ <descripción truncada a ~220 caracteres…>        │
+└──────────────────────────────────────────────────┘
+```
+
+- **Título** (`st.markdown` con `###`): nombre del destino o id si falta.
+- **Score** en una columna estrecha usando `st.metric`, con 3 decimales.
+- **Línea meta** (`st.caption`): país (cuando existe) e identificador en
+  monoespaciado para que sea copiable desde la UI.
+- **Descripción truncada** por
+  [`truncate_description`](../src/ui/app.py), que corta en el último espacio
+  antes del límite y añade `…` para evitar partir palabras por la mitad.
+- El contenedor usa `st.container(border=True)` para separar visualmente cada
+  resultado sin introducir CSS propio.
+
+La decisión de dejar la descripción completa en la respuesta de la API (y
+truncar sólo en render) permite que otros clientes ajusten el límite sin
+cambios en el backend.
 
 ### Manejo de errores
 

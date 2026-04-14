@@ -12,11 +12,11 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from src.api.main import app, get_index, get_retriever
+from src.api.main import app, get_destinations, get_index, get_retriever
 from src.api.schemas import DestinationResult
 from src.indexing.inverted_index import InvertedIndex
 from src.retrieval.extended_boolean import ExtendedBoolean
-from src.ui.app import search_destinations
+from src.ui.app import search_destinations, truncate_description
 
 
 def _build_index() -> InvertedIndex:
@@ -32,6 +32,14 @@ def api_client() -> TestClient:
     idx = _build_index()
     app.dependency_overrides[get_index] = lambda: idx
     app.dependency_overrides[get_retriever] = lambda: ExtendedBoolean(p=2.0)
+    app.dependency_overrides[get_destinations] = lambda: {
+        "doc-beach": {
+            "name": "Playa Azul",
+            "country": "México",
+            "description": "Arena blanca y mar tibio durante todo el año.",
+            "image_urls": [],
+        }
+    }
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
@@ -53,12 +61,36 @@ def test_search_destinations_respects_top_k(api_client: TestClient) -> None:
     assert len(results) == 1
 
 
+def test_search_destinations_propagates_metadata(api_client: TestClient) -> None:
+    """T044 — La UI recibe nombre/país/descripción cuando la API los provee."""
+    results = search_destinations("beach", top_k=5, client=api_client)
+    top = next(r for r in results if r.id == "doc-beach")
+    assert top.name == "Playa Azul"
+    assert top.country == "México"
+    assert top.description is not None
+    assert "Arena blanca" in top.description
+
+
+def test_truncate_description_respects_limit() -> None:
+    text = "palabra " * 80
+    out = truncate_description(text, max_chars=50)
+    assert len(out) <= 51  # incluye el carácter de elipsis
+    assert out.endswith("…")
+
+
+def test_truncate_description_keeps_short_text() -> None:
+    assert truncate_description("corto") == "corto"
+    assert truncate_description(None) == ""
+    assert truncate_description("") == ""
+
+
 def test_search_destinations_raises_on_http_error() -> None:
     def _fail() -> InvertedIndex:
         raise HTTPException(status_code=503, detail="index unavailable")
 
     app.dependency_overrides[get_index] = _fail
     app.dependency_overrides[get_retriever] = lambda: ExtendedBoolean(p=2.0)
+    app.dependency_overrides[get_destinations] = lambda: {}
 
     try:
         with TestClient(app) as client:

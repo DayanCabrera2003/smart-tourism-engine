@@ -1,10 +1,12 @@
-"""T043 — Streamlit MVP para consultar el endpoint ``POST /search``.
+"""T043/T044 — Streamlit UI para consultar el endpoint ``POST /search``.
 
-Scope mínimo (T043): input de texto, botón de búsqueda y lista de resultados.
-Las tarjetas visuales, imágenes y sliders se añaden en T044-T047.
+- T043: input de texto, botón de búsqueda y llamada HTTP a la API.
+- T044: cada resultado se renderiza como una tarjeta con nombre, país,
+  descripción truncada y score. Las imágenes (T045) y los sliders (T047)
+  llegarán en tareas siguientes.
 
-La lógica de llamada HTTP vive en :func:`search_destinations` para poder
-testearse sin necesidad de levantar el runtime de Streamlit.
+La lógica de llamada HTTP y el helper de truncado viven como funciones puras
+para poder testearlos sin necesidad de levantar el runtime de Streamlit.
 """
 from __future__ import annotations
 
@@ -16,6 +18,21 @@ from src.api.schemas import DestinationResult, SearchResponse
 
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
+DESCRIPTION_MAX_CHARS = 220
+
+
+def truncate_description(text: str | None, max_chars: int = DESCRIPTION_MAX_CHARS) -> str:
+    """Trunca la descripción a ``max_chars`` cortando en el último espacio (T044)."""
+    if not text:
+        return ""
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    cut = text[: max_chars - 1]
+    space = cut.rfind(" ")
+    if space > max_chars // 2:
+        cut = cut[:space]
+    return cut.rstrip() + "…"
 
 
 def search_destinations(
@@ -73,7 +90,24 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
 
         st.subheader(f"{len(results)} resultado(s)")
         for rank, hit in enumerate(results, start=1):
-            st.write(f"**{rank}. {hit.id}** — score `{hit.score:.4f}`")
+            _render_card(st, rank, hit)
+
+
+def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no cover - Streamlit
+    """Renderiza un destino como tarjeta con nombre, país, descripción y score (T044)."""
+    with st.container(border=True):
+        header, score_col = st.columns([6, 1])
+        title = hit.name or hit.id
+        header.markdown(f"### {rank}. {title}")
+        score_col.metric(label="score", value=f"{hit.score:.3f}")
+        meta_bits: list[str] = []
+        if hit.country:
+            meta_bits.append(f":earth_americas: {hit.country}")
+        meta_bits.append(f"`{hit.id}`")
+        header.caption(" · ".join(meta_bits))
+        description = truncate_description(hit.description)
+        if description:
+            st.write(description)
 
 
 if __name__ == "__main__":  # pragma: no cover
