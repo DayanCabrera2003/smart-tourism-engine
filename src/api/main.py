@@ -3,6 +3,8 @@
 T039 — Expone el endpoint ``GET /health`` para verificación de disponibilidad.
 T040 — Expone el endpoint ``POST /search`` que delega en el recuperador
        Booleano Extendido (p-norm) y devuelve los destinos rankeados.
+T042 — Registra el middleware de logging y los handlers de errores unificados
+       definidos en ``src/api/middleware.py``.
 """
 from __future__ import annotations
 
@@ -12,8 +14,9 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
-from pydantic import BaseModel, Field
 
+from src.api import middleware
+from src.api.schemas import DestinationResult, SearchRequest, SearchResponse
 from src.config import settings
 from src.indexing.inverted_index import InvertedIndex
 from src.retrieval.extended_boolean import ExtendedBoolean
@@ -23,22 +26,7 @@ app = FastAPI(
     description="API de recuperación de información turística.",
     version="0.1.0",
 )
-
-
-# ── Schemas mínimos (se formalizarán en T041) ────────────────────────────────
-
-class SearchRequest(BaseModel):
-    query: str = Field(..., min_length=1, description="Consulta con operadores AND/OR.")
-    top_k: int = Field(10, ge=1, le=100, description="Número máximo de resultados.")
-
-
-class SearchHit(BaseModel):
-    id: str
-    score: float
-
-
-class SearchResponse(BaseModel):
-    results: list[SearchHit]
+middleware.install(app)
 
 
 # ── Dependencias ──────────────────────────────────────────────────────────────
@@ -84,4 +72,6 @@ def search(
 ) -> SearchResponse:
     """Busca destinos con el Booleano Extendido (p-norm) y los devuelve rankeados."""
     hits = retriever.search(request.query, index, top_k=request.top_k)
-    return SearchResponse(results=[SearchHit(id=doc_id, score=score) for doc_id, score in hits])
+    return SearchResponse(
+        results=[DestinationResult(id=doc_id, score=score) for doc_id, score in hits]
+    )
