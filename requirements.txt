@@ -5,6 +5,7 @@ pydantic-settings
 python-dotenv
 typer
 httpx
+streamlit
 # Development dependencies
 pytest
 pytest-cov

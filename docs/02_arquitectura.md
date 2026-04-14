@@ -82,7 +82,7 @@ Delega en `ExtendedBoolean.search` usando el índice invertido persistido en `da
 - `query` (str, obligatorio): consulta con operadores `AND` / `OR` en mayúsculas.
 - `top_k` (int, 1-100, por defecto 10): número máximo de resultados.
 
-**Response** (`SearchResponse`):
+**Response** (`SearchResponse`): lista de `DestinationResult` ordenada de mayor a menor `score`.
 
 ```json
 {
@@ -93,7 +93,39 @@ Delega en `ExtendedBoolean.search` usando el índice invertido persistido en `da
 }
 ```
 
-La lista viene ordenada de mayor a menor `score` (valor en `[0, 1]`). Si el índice no está disponible en disco, la ruta responde `503`. Los schemas se formalizan en `src/api/schemas.py` como parte de T041.
+- `results[*].id` (str): identificador del destino en el corpus.
+- `results[*].score` (float, `[0, 1]`): score del Booleano Extendido.
+
+Si el índice no está disponible en disco, la ruta responde `503`. Los schemas `SearchRequest`, `SearchResponse` y `DestinationResult` viven en [`src/api/schemas.py`](../src/api/schemas.py) (T041) y se reutilizan desde la API y la futura UI.
+
+## Manejo de errores (T042)
+
+El módulo [`src/api/middleware.py`](../src/api/middleware.py) centraliza dos responsabilidades transversales del servicio, registradas en `app` mediante `middleware.install(app)`:
+
+### Logging de requests
+
+`RequestLoggingMiddleware` envuelve cada request y emite un log `INFO` al logger `smart_tourism_engine.api` con los campos `request_id`, `method`, `path`, `status_code` y `duration_ms`. El `request_id` (12 hex) se expone además como cabecera `X-Request-ID` en la respuesta para correlacionar logs con clientes. Si el handler lanza una excepción no capturada, se emite un log `ERROR` con stack trace antes de re-lanzarla para que el handler de excepciones la formatee.
+
+### Respuesta uniforme de errores
+
+Todos los errores devueltos por la API siguen el mismo contrato JSON:
+
+```json
+{
+  "code": "validation_error",
+  "message": "Request payload inválido."
+}
+```
+
+| Origen                                | `status` | `code`                |
+|---------------------------------------|----------|-----------------------|
+| `HTTPException(404, ...)`             | 404      | `not_found`           |
+| `HTTPException(503, ...)` (sin índice)| 503      | `service_unavailable` |
+| `RequestValidationError` (Pydantic)   | 422      | `validation_error`    |
+| Excepción no controlada               | 500      | `internal_error`      |
+| Otros `HTTPException`                 | `exc.status_code` | `http_error` (fallback) |
+
+La tabla `_HTTP_CODE_MAP` en `middleware.py` concentra el mapeo `status_code → code`, evitando dispersión de literales entre handlers. Los códigos son identificadores estables pensados para que la UI y clientes externos discriminen casos sin parsear mensajes en español.
 
 ## Observabilidad
 
