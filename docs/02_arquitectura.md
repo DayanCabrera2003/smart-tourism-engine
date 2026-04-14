@@ -57,6 +57,16 @@ El `id` de cada destino es la clave primaria en SQLite y el `id` del punto en Qd
 - **docker/**: Configuraciones para la contenedorización del sistema.
 - **scripts/**: Utilidades para tareas administrativas y de compilación del informe.
 
+## Endpoints de la API
+
+La aplicación FastAPI vive en `src/api/main.py` y se arranca con `uvicorn src.api.main:app --reload`.
+
+| Método | Ruta      | Descripción                                           | Respuesta                 |
+|--------|-----------|-------------------------------------------------------|---------------------------|
+| GET    | `/health` | Sonda de disponibilidad del servicio (liveness probe). | `{"status": "ok"}` (200) |
+
+Los endpoints de búsqueda (`/search`) y demás se documentan en secciones posteriores a medida que se implementan.
+
 ## Observabilidad
 
 El sistema utiliza un esquema de **Logging Estructurado** en formato JSON, facilitando su integración con herramientas modernas de agregación y análisis de logs (como ELK Stack o Loki).
