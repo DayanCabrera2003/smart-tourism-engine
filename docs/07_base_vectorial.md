@@ -57,6 +57,37 @@ La URL del servidor se toma de `settings.QDRANT_URL`
 dentro de Docker Compose). En tests se inyecta `url=":memory:"`, lo que
 arranca un Qdrant embebido sin red.
 
+## Modelo de embeddings: `TextEmbedder`
+
+La clase [`src/indexing/embedder.py`](../src/indexing/embedder.py) envuelve
+`sentence-transformers` y expone un único método `embed(text) -> list[float]`
+que produce el vector denso usado como entrada a Qdrant:
+
+```python
+from src.indexing.embedder import TextEmbedder
+
+embedder = TextEmbedder()
+vector = embedder.embed("Playas del Caribe colombiano")
+assert len(vector) == TextEmbedder.DIMENSION  # 384
+```
+
+### ¿Por qué `all-MiniLM-L6-v2`?
+
+| Criterio | `all-MiniLM-L6-v2` | Alternativas |
+|----------|--------------------|--------------|
+| Tamaño | ~90 MB, 22 M parámetros | `mpnet-base-v2` ~420 MB; modelos LLM > 1 GB |
+| Dimensión | 384 | `mpnet-base-v2` 768 (mayor coste en Qdrant) |
+| Velocidad CPU | ~14 k oraciones/s en un i7 moderno | `mpnet` ~2.8 k/s |
+| Multilingüe | Rinde razonablemente en ES/EN tras fine-tuning de STS | Modelos monolingües pierden en EN+ES mixto |
+| Licencia | Apache-2.0 | Varias |
+
+Para un catálogo de destinos con descripciones cortas (pocos párrafos) y una
+máquina de desarrollo sin GPU, MiniLM ofrece el mejor equilibrio
+**calidad/velocidad/tamaño** y encaja con la dimensión 384 que usará la
+colección `destinations_text`. Los vectores se generan **normalizados L2**
+(`normalize_embeddings=True`) para que la métrica `Cosine` en Qdrant sea
+numéricamente equivalente al producto punto.
+
 ### Tests
 
 [`tests/test_vector_store.py`](../tests/test_vector_store.py) cubre:
@@ -69,3 +100,7 @@ arranca un Qdrant embebido sin red.
 
 Todos corren contra el cliente en memoria, por lo que no requieren un
 servicio Qdrant externo en CI.
+
+[`tests/test_embedder.py`](../tests/test_embedder.py) inyecta un modelo
+falso con la misma API de `SentenceTransformer.encode`, por lo que no se
+descargan pesos del Hub durante las pruebas.
