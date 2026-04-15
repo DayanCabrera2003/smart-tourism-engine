@@ -104,3 +104,38 @@ servicio Qdrant externo en CI.
 [`tests/test_embedder.py`](../tests/test_embedder.py) inyecta un modelo
 falso con la misma API de `SentenceTransformer.encode`, por lo que no se
 descargan pesos del Hub durante las pruebas.
+
+## Esquema de la colección `destinations_text`
+
+La colección que aloja los embeddings de los destinos se llama
+`destinations_text`. Sus parámetros son:
+
+| Aspecto | Valor | Justificación |
+|---------|-------|---------------|
+| Nombre | `destinations_text` | Separa vectores textuales de futuras colecciones (p. ej. imágenes). |
+| Dimensión | `384` | Coincide con la salida de `all-MiniLM-L6-v2` (`TextEmbedder.DIMENSION`). |
+| Distancia | `Cosine` | Los vectores se entregan normalizados L2, por lo que coseno ≡ producto punto. |
+| ID del punto | entero o UUID | Qdrant exige uno de estos dos tipos; usaremos el id interno del destino. |
+| Payload típico | `{ "name": str, "country": str, "slug": str, ... }` | Campos que el recuperador expondrá al UI tras un hit. |
+
+### Script `scripts/init_qdrant.py` (T051)
+
+El script crea la colección de forma idempotente contra la URL definida en
+`settings.QDRANT_URL`:
+
+```bash
+# Crea la colección si no existe
+python scripts/init_qdrant.py
+
+# Fuerza recreación destructiva (útil tras cambios de esquema)
+python scripts/init_qdrant.py --recreate
+
+# Override explícito de URL (p. ej. apuntando al contenedor local)
+python scripts/init_qdrant.py --url http://localhost:6333
+```
+
+Expone una función `init(store, *, recreate=False)` para invocarla desde
+tests con un `VectorStore` en memoria, de modo que
+[`tests/test_init_qdrant.py`](../tests/test_init_qdrant.py) verifica la
+creación, la idempotencia y el borrado con `--recreate` sin depender de un
+servicio Qdrant externo.
