@@ -32,6 +32,46 @@ def build_index_cmd():
         raise typer.Exit(code=1) from exc
 
 
+@app.command("embed")
+def embed_cmd(
+    source: str = typer.Option(
+        None,
+        "--source",
+        help="Ruta al JSONL de destinos. Por defecto data/processed/destinations.jsonl.",
+    ),
+    batch_size: int = typer.Option(
+        64, "--batch-size", min=1, help="Tamaño del batch de upsert a Qdrant."
+    ),
+    collection: str = typer.Option(
+        None, "--collection", help="Nombre de la colección Qdrant (default: destinations_text)."
+    ),
+):
+    """Genera embeddings de los destinos y los sube a Qdrant (T052)."""
+    from src.indexing.embed_destinations import DEFAULT_COLLECTION, embed_destinations
+    from src.indexing.embedder import TextEmbedder
+    from src.indexing.vector_store import VectorStore
+
+    src_path = (
+        settings.DATA_DIR / "processed" / "destinations.jsonl"
+        if source is None
+        else source
+    )
+    coll = collection or DEFAULT_COLLECTION
+
+    try:
+        total = embed_destinations(
+            src_path,
+            VectorStore(),
+            TextEmbedder(),
+            collection=coll,
+            batch_size=batch_size,
+        )
+        typer.echo(f"Embeddings subidos a '{coll}': {total} puntos.")
+    except FileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+
 @ingest_app.command("wikivoyage")
 def ingest_wikivoyage_cmd():
     """
