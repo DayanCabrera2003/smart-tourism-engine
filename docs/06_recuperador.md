@@ -368,3 +368,77 @@ top-1 correcto, respeto a `top_k`, orden por score, propagación del payload,
 enriquecimiento opcional con `destinations.db`, validación del body
 (`query` requerida, `top_k` ∈ [1, 100]). Ningún test depende de Qdrant ni
 descarga pesos del Hub.
+
+---
+
+## Híbrido: Booleano Extendido + semántico (T054)
+
+[`src/retrieval/hybrid.py`](../src/retrieval/hybrid.py) implementa
+`HybridRetriever`, que combina las dos ramas descritas arriba en un único
+ranking mediante una mezcla lineal convexa parametrizada por `α ∈ [0, 1]`:
+
+```
+final(d) = α · score_léxico(d) + (1 - α) · score_semántico(d)
+```
+
+- `α = 1.0` → solo Booleano Extendido (equivalente a `/search`).
+- `α = 0.0` → solo semántico (equivalente a `/search/semantic`).
+- `α = 0.5` (por defecto) → mezcla balanceada.
+
+Ambos scores viven en `[0, 1]` antes de la fusión: el léxico lo garantiza la
+norma-p (Salton, Fox & Wu, 1983) y el coseno de Qdrant se recorta a `[0, 1]`
+para neutralizar valores marginalmente negativos.
+
+### Fusion strategy: unión, no intersección
+
+La fusión se hace sobre la **unión** de candidatos de ambas ramas: un
+documento presente solo en el ranking léxico aporta `α · score_léxico` con
+la rama semántica tratada como `0`, y viceversa. Esto preserva la
+complementariedad descrita en la tabla anterior —documentos que el léxico
+no detecta por falta de coincidencia literal pueden aun así rankear bien si
+la rama semántica los recupera, y viceversa—.
+
+Usar intersección sería más restrictivo pero descartaría justo los casos
+que justifican el híbrido (paráfrasis no léxicas, términos exactos ausentes
+del espacio semántico). La unión mantiene el recall de ambas ramas y deja
+que la mezcla lineal decida el orden.
+
+### fetch_k: traer candidatos extra antes de fusionar
+
+Cada rama se consulta con `fetch_k = max(top_k · 3, 30)` en vez de `top_k`
+directo. Motivación: un documento puede ocupar el puesto 25 en la rama
+semántica y el 3 en la léxica; si solo tomamos el top-`top_k` de cada lado,
+ese documento quedaría fuera de la fusión pese a que su score combinado lo
+pondría en el top-`top_k` final. El sobre-muestreo es barato (ambas ramas
+ya recorren todo el índice/ANN) y evita este efecto de truncamiento.
+
+### API programática
+
+```python
+from src.retrieval.hybrid import HybridRetriever
+from src.retrieval.extended_boolean import ExtendedBoolean
+from src.indexing.embedder import TextEmbedder
+from src.indexing.vector_store import VectorStore
+
+hybrid = HybridRetriever(
+    extended=ExtendedBoolean(p=2.0),
+    embedder=TextEmbedder(),
+    store=VectorStore(),
+    collection="destinations_text",
+    alpha=0.5,
+)
+hits = hybrid.search("playas tranquilas", index, top_k=10)
+# → [("wikivoyage-varadero", 0.83), ...]
+```
+
+El endpoint HTTP y el selector de modo en la UI llegan en **T055**.
+
+### Tests
+
+[`tests/test_hybrid.py`](../tests/test_hybrid.py) construye un
+`InvertedIndex` con cuatro documentos y un `VectorStore(":memory:")` con
+payloads que solapan parcialmente (un slug vive solo en el store, otro
+solo en el índice léxico). Con un embedder determinista de dimensión 4
+verifica: validación de `α ∈ [0, 1]`, equivalencia con cada rama en los
+extremos (`α=1.0` / `α=0.0`), inclusión de documentos exclusivos de una
+rama, orden descendente, respeto a `top_k` y clamping a `[0, 1]`.
