@@ -11,6 +11,8 @@ T045 — Propaga ``image_urls`` (lista de URLs) para que la UI muestre la
        primera imagen disponible en cada tarjeta.
 T047 — Acepta ``p`` en el body y construye el recuperador p-norm por
        petición, permitiendo a la UI exponer el parámetro en un slider.
+T053 — Expone ``POST /search/semantic`` que embebe la consulta y consulta
+       la colección ``destinations_text`` de Qdrant directamente.
 """
 from __future__ import annotations
 
@@ -25,9 +27,17 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import select
 
 from src.api import middleware
-from src.api.schemas import DestinationResult, SearchRequest, SearchResponse
+from src.api.schemas import (
+    DestinationResult,
+    SearchRequest,
+    SearchResponse,
+    SemanticSearchRequest,
+)
 from src.config import settings
+from src.indexing.embed_destinations import DEFAULT_COLLECTION
+from src.indexing.embedder import TextEmbedder
 from src.indexing.inverted_index import InvertedIndex
+from src.indexing.vector_store import VectorStore
 from src.retrieval.extended_boolean import ExtendedBoolean
 
 app = FastAPI(
@@ -101,6 +111,31 @@ def get_destinations() -> dict[str, dict[str, object]]:
     return _load_destinations_from_disk()
 
 
+@lru_cache(maxsize=1)
+def _default_vector_store() -> VectorStore:
+    return VectorStore()
+
+
+def get_vector_store() -> VectorStore:
+    """Provee el cliente de Qdrant (T053).  Inyectable en tests."""
+    return _default_vector_store()
+
+
+@lru_cache(maxsize=1)
+def _default_embedder() -> TextEmbedder:
+    return TextEmbedder()
+
+
+def get_embedder() -> TextEmbedder:
+    """Provee el embedder de texto (T053).  Inyectable en tests."""
+    return _default_embedder()
+
+
+def get_semantic_collection() -> str:
+    """Nombre de la colección Qdrant a consultar (T053)."""
+    return DEFAULT_COLLECTION
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -136,6 +171,46 @@ def search(
                 country=meta.get("country"),
                 description=meta.get("description"),
                 image_urls=list(meta.get("image_urls") or []),
+            )
+        )
+    return SearchResponse(results=results)
+
+
+VectorStoreDep = Annotated[VectorStore, Depends(get_vector_store)]
+EmbedderDep = Annotated[TextEmbedder, Depends(get_embedder)]
+SemanticCollectionDep = Annotated[str, Depends(get_semantic_collection)]
+
+
+@app.post("/search/semantic", response_model=SearchResponse)
+def search_semantic(
+    request: SemanticSearchRequest,
+    store: VectorStoreDep,
+    embedder: EmbedderDep,
+    collection: SemanticCollectionDep,
+    destinations: DestinationsDep,
+) -> SearchResponse:
+    """Búsqueda semántica (T053): embebe la query y consulta Qdrant directamente."""
+    try:
+        query_vector = embedder.embed(request.query)
+        hits = store.search(collection, query_vector, top_k=request.top_k)
+    except Exception as exc:  # pragma: no cover - delegado a middleware
+        raise HTTPException(
+            status_code=503,
+            detail=f"Búsqueda semántica no disponible: {exc}",
+        ) from exc
+
+    results: list[DestinationResult] = []
+    for _point_id, score, payload in hits:
+        slug = str(payload.get("slug") or _point_id)
+        meta = destinations.get(slug) or {}
+        results.append(
+            DestinationResult(
+                id=slug,
+                score=max(0.0, min(1.0, float(score))),
+                name=payload.get("name") or meta.get("name"),
+                country=payload.get("country") or meta.get("country"),
+                description=meta.get("description"),
+                image_urls=list(payload.get("image_urls") or meta.get("image_urls") or []),
             )
         )
     return SearchResponse(results=results)

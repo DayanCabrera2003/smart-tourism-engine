@@ -283,3 +283,88 @@ Para regenerar el índice:
 ```bash
 python -m src.cli build-index data/raw/destinations.jsonl --output data/processed/index.pkl
 ```
+
+---
+
+## Búsqueda semántica simple (T053)
+
+`POST /search/semantic` complementa al recuperador léxico: en vez de evaluar
+operadores AND/OR sobre el índice invertido, embebe la consulta con
+`TextEmbedder` (`all-MiniLM-L6-v2`, 384 d, normalizado L2) y la lanza contra
+la colección `destinations_text` de Qdrant para devolver los `top_k` vecinos
+más cercanos por similitud coseno.
+
+### API
+
+```http
+POST /search/semantic
+Content-Type: application/json
+
+{
+  "query": "playas tranquilas del Caribe",
+  "top_k": 5
+}
+```
+
+La respuesta reutiliza el mismo `SearchResponse` que `/search`: cada
+`DestinationResult` viene con `id` (slug del destino), `score` ∈ [0, 1]
+(coseno), y los campos `name`, `country`, `image_urls` tomados del payload
+de Qdrant. La `description` se enriquece desde `destinations.db` cuando está
+disponible.
+
+### Pipeline
+
+```
+query (str)
+    │
+    ▼
+TextEmbedder.embed(query)        # vector ∈ ℝ³⁸⁴, ‖v‖₂ = 1
+    │
+    ▼
+VectorStore.search(
+    "destinations_text",
+    query_vector,
+    top_k=K,
+)                                 # cosine similarity en Qdrant
+    │
+    ▼
+[(uuid, score, payload), …]
+    │  payload["slug"] → enriquecimiento opcional con destinations.db
+    ▼
+[DestinationResult, …]            # ordenados por score desc
+```
+
+### Booleano Extendido (`/search`) vs semántico (`/search/semantic`)
+
+| Aspecto | `/search` (Booleano Extendido p-norm) | `/search/semantic` (Qdrant + MiniLM) |
+|---------|---------------------------------------|--------------------------------------|
+| Representación de la query | AST de operadores AND/OR sobre tokens | Vector denso `ℝ³⁸⁴` normalizado |
+| Representación del documento | Postings TF-IDF normalizados por término | Embedding del texto `"{name}. {description}"` |
+| Score | Norma-p combinando pesos por término ∈ [0, 1] | Similitud coseno ∈ [-1, 1] (clamped a [0, 1]) |
+| Coincidencia léxica exacta | Sí (vía stemming Snowball) | Sólo si el modelo aprendió la asociación |
+| Sinónimos / paráfrasis | No (`"playa"` y `"costa"` son términos distintos) | Sí (vectores cercanos en el espacio latente) |
+| Multilingüe | Sólo si el corpus comparte el idioma del query | Sí, MiniLM mantiene proximidad ES↔EN para conceptos comunes |
+| Operadores explícitos | AND/OR/NOT con precedencia | Ninguno; la intención se infiere del embedding |
+| Coste por consulta | O(\|términos\| · \|postings\|) en RAM | 1 forward del modelo (~ms en CPU) + ANN en Qdrant |
+| Dependencias en runtime | Pickle del índice invertido | Modelo `sentence-transformers` + servicio Qdrant |
+| Falla suave | Devuelve top-k aunque sólo un término aparezca | Siempre devuelve `top_k` (incluso si la similitud es baja) |
+| Idoneidad | Consultas con vocabulario controlado o booleanas | Lenguaje natural, sinónimos, descripciones libres |
+
+**Cuándo elegir cada uno.** El Booleano Extendido brilla cuando el usuario
+sabe los términos exactos (`"museum AND art"`) y quiere control booleano
+fino; falla en consultas conversacionales (`"un pueblo costero relajado"`)
+porque cada palabra cuenta como literal. El semántico hace lo opuesto:
+absorbe paráfrasis y cambios de idioma sin esfuerzo, pero pierde precisión
+cuando la query es esencialmente una expresión booleana o cuando el corpus
+es pequeño y el modelo no logra distinguir matices. Esta complementariedad
+motiva el recuperador híbrido de **T054**, que combina ambos rankings.
+
+### Tests
+
+[`tests/test_api_search_semantic.py`](../tests/test_api_search_semantic.py)
+inyecta un `VectorStore(url=":memory:")` sembrado con tres puntos y un
+embedder determinista (vectores canónicos de dimensión 4) para verificar:
+top-1 correcto, respeto a `top_k`, orden por score, propagación del payload,
+enriquecimiento opcional con `destinations.db`, validación del body
+(`query` requerida, `top_k` ∈ [1, 100]). Ningún test depende de Qdrant ni
+descarga pesos del Hub.

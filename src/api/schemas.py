@@ -35,6 +35,22 @@ class SearchRequest(BaseModel):
     )
 
 
+class SemanticSearchRequest(BaseModel):
+    """Cuerpo del ``POST /search/semantic`` (T053)."""
+
+    query: str = Field(
+        ...,
+        min_length=1,
+        description="Consulta en lenguaje natural; se embebe con TextEmbedder.",
+    )
+    top_k: int = Field(
+        10,
+        ge=1,
+        le=100,
+        description="Número máximo de vecinos a devolver desde Qdrant.",
+    )
+
+
 class DestinationResult(BaseModel):
     """Destino rankeado devuelto por el recuperador p-norm."""
 
