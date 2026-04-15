@@ -139,3 +139,51 @@ tests con un `VectorStore` en memoria, de modo que
 [`tests/test_init_qdrant.py`](../tests/test_init_qdrant.py) verifica la
 creación, la idempotencia y el borrado con `--recreate` sin depender de un
 servicio Qdrant externo.
+
+## Pipeline de embedding (T052)
+
+El módulo [`src/indexing/embed_destinations.py`](../src/indexing/embed_destinations.py)
+recorre el JSONL de destinos procesados
+(`data/processed/destinations.jsonl`), genera un embedding por destino con
+`TextEmbedder` y los sube a la colección `destinations_text` en batches.
+
+El comando CLI `python -m src.cli embed` envuelve el pipeline:
+
+```bash
+# Embeber todo el corpus en Qdrant (requiere colección ya creada por T051)
+python -m src.cli embed
+
+# Override de fuente y tamaño de batch
+python -m src.cli embed --source data/processed/destinations.jsonl --batch-size 128
+```
+
+### Texto a embeber
+
+Para cada destino se construye la cadena `f"{name}. {description}"` con
+acentos y puntuación — el modelo multilingüe `all-MiniLM-L6-v2` aprovecha
+los diacríticos, a diferencia del índice Booleano Extendido que consume
+`description_normalized`.
+
+### ID del punto
+
+Qdrant exige que los IDs sean enteros o UUIDs. Como el `id` de un destino
+es un slug textual (p. ej. `madrid-es`), lo convertimos a UUID5 determinista
+con un namespace fijo (`slug_to_uuid`). El slug original se preserva en el
+payload bajo la clave `slug` para que el recuperador pueda devolverlo a la
+UI tras un hit. La función es determinista, por lo que re-ejecutar el
+comando `embed` actualiza puntos existentes en lugar de duplicarlos
+(idempotencia sobre el mismo corpus).
+
+### Payload
+
+Se copian del destino los campos `name`, `country`, `region`, `tags`,
+`image_urls`, `source`, más el `slug`. Son los mismos que la UI necesita
+para renderizar una *card* sin consultar otra base de datos.
+
+### Tests
+
+[`tests/test_embed_destinations.py`](../tests/test_embed_destinations.py)
+cubre el conteo de puntos, la forma del payload, la división en batches
+de tamaño configurable, el archivo vacío, la idempotencia y el error
+cuando falta el JSONL de origen. Todos corren contra `VectorStore(url=":memory:")`
+con un embedder de 8 dimensiones, sin red ni descargas de modelos.
