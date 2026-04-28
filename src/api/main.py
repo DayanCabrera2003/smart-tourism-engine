@@ -17,6 +17,7 @@ T055 — Expone ``POST /search/hybrid`` que combina Booleano Extendido y
        semántico con peso ``alpha`` configurable.
 T065 — Expone ``POST /ask`` que delega en ``RagPipeline`` para responder
        preguntas en lenguaje natural con contexto recuperado.
+T069 — Expone ``POST /ask/stream`` con SSE para streaming en tiempo real.
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from src.rag.pipeline import RagPipeline
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
 from src.api import middleware
@@ -301,3 +303,25 @@ def ask(request: AskRequest, pipeline: RagPipelineDep) -> AskResponse:
         mode=request.mode,
         alpha=request.alpha,
     )
+
+
+@app.post("/ask/stream")
+def ask_stream(request: AskRequest, pipeline: RagPipelineDep) -> StreamingResponse:
+    """Respuesta RAG en streaming SSE (T069).
+
+    Emite eventos en el formato:
+        data: <token>\\n\\n
+        data: [DONE]\\n\\n
+        data: {"sources": [...], "low_confidence": bool}\\n\\n
+    """
+
+    def _event_generator():
+        for chunk in pipeline.answer_stream(
+            request.query,
+            top_k=request.top_k,
+            mode=request.mode,
+            alpha=request.alpha,
+        ):
+            yield f"data: {chunk}\n\n"
+
+    return StreamingResponse(_event_generator(), media_type="text/event-stream")
