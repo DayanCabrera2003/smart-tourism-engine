@@ -231,3 +231,38 @@ fallback.
 > **Hito**: con esta demo reproducible queda cerrado el **Corte 1**
 > (T001 – T048): ingestión + indexación + recuperador Booleano Extendido
 > + API + UI Streamlit en Docker Compose.
+
+## T055 — Selector de modo y slider de alpha
+
+La UI expone ahora tres modos de búsqueda seleccionables mediante radio
+buttons en el sidebar:
+
+| Modo | Endpoint | Descripción |
+|------|----------|-------------|
+| **Booleano Extendido** | `POST /search` | Rankeo léxico con p-norm (Salton/Fox/Wu 1983). Soporta operadores `AND`/`OR` en mayúsculas. |
+| **Semántico** | `POST /search/semantic` | Embeddings densos con `all-MiniLM-L6-v2` consultados en Qdrant. Sin operadores; lenguaje natural. |
+| **Hibrido** | `POST /search/hybrid` | Combinación lineal de ambos modos: `score = α · léxico + (1-α) · semántico`. |
+
+### Slider de alpha
+
+Visible únicamente en el modo **Hibrido**, el slider `alpha` recorre `[0.0, 1.0]`
+en pasos de `0.05`:
+
+- `alpha = 1.0` → solo Booleano Extendido (ignora la rama semántica).
+- `alpha = 0.0` → solo semántico (ignora la rama léxica).
+- `alpha = 0.5` → mezcla equilibrada (valor por defecto).
+
+### Efecto sobre la consulta
+
+En modo **Booleano Extendido**, el placeholder del input sigue siendo
+`playa AND España` para recordar los operadores soportados. En modo
+**Semántico** o **Hibrido**, cambia a `playas del caribe` para indicar
+que se espera lenguaje natural. La diferencia es solo visual: el backend
+acepta cualquier cadena en los tres endpoints.
+
+### Parámetros combinados (modo Híbrido)
+
+Cuando el modo es **Hibrido**, el sidebar muestra los tres parámetros:
+`top_k`, `p` (para la rama léxica) y `alpha` (peso de la fusión). En modo
+**Semántico** sólo aparece `top_k`, ya que el endpoint no consume `p` ni
+`alpha`.

@@ -1,4 +1,4 @@
-"""T043/T044/T045/T047 — Streamlit UI para consultar el endpoint ``POST /search``.
+"""T043/T044/T045/T047/T055 — Streamlit UI para consultar los endpoints de búsqueda.
 
 - T043: input de texto, botón de búsqueda y llamada HTTP a la API.
 - T044: cada resultado se renderiza como una tarjeta con nombre, país,
@@ -8,9 +8,11 @@
   o la URL no es válida.
 - T047: el sidebar expone sliders para ``top_k`` (1-50) y ``p`` (1-10) del
   Booleano Extendido, que se envían al backend en cada búsqueda.
+- T055: radio buttons para seleccionar el modo de búsqueda (Booleano
+  Extendido / Semántico / Híbrido) y slider para el peso ``alpha``.
 
-La lógica de llamada HTTP y el helper de truncado viven como funciones puras
-para poder testearlos sin necesidad de levantar el runtime de Streamlit.
+La lógica de llamada HTTP y los helpers viven como funciones puras para poder
+testearlos sin necesidad de levantar el runtime de Streamlit.
 """
 from __future__ import annotations
 
@@ -30,6 +32,15 @@ TOP_K_MAX = 50
 DEFAULT_P = 2.0
 P_MIN = 1.0
 P_MAX = 10.0
+
+SEARCH_MODE_BOOLEAN = "Booleano Extendido"
+SEARCH_MODE_SEMANTIC = "Semantico"
+SEARCH_MODE_HYBRID = "Hibrido"
+SEARCH_MODES = [SEARCH_MODE_BOOLEAN, SEARCH_MODE_SEMANTIC, SEARCH_MODE_HYBRID]
+
+DEFAULT_ALPHA = 0.5
+ALPHA_MIN = 0.0
+ALPHA_MAX = 1.0
 
 
 def pick_cover_image(image_urls: list[str] | None) -> str | None:
@@ -63,22 +74,36 @@ def truncate_description(text: str | None, max_chars: int = DESCRIPTION_MAX_CHAR
 def search_destinations(
     query: str,
     *,
+    mode: str = SEARCH_MODE_BOOLEAN,
     top_k: int = DEFAULT_TOP_K,
     p: float = DEFAULT_P,
+    alpha: float = DEFAULT_ALPHA,
     api_url: str = API_URL,
     client: httpx.Client | None = None,
 ) -> list[DestinationResult]:
-    """Llama a ``POST {api_url}/search`` y devuelve los destinos rankeados.
+    """Llama al endpoint de búsqueda adecuado y devuelve los destinos rankeados.
 
-    El parámetro ``client`` permite inyectar un ``httpx.Client`` en tests
-    (p.ej. uno montado sobre la app FastAPI). ``p`` es la norma-p del
-    Booleano Extendido (T047).
+    Selecciona el endpoint según ``mode``:
+    - ``SEARCH_MODE_BOOLEAN``  → ``POST /search`` (Booleano Extendido, T047)
+    - ``SEARCH_MODE_SEMANTIC`` → ``POST /search/semantic`` (T053)
+    - ``SEARCH_MODE_HYBRID``   → ``POST /search/hybrid`` (T055)
+
+    El parámetro ``client`` permite inyectar un ``httpx.Client`` en tests.
     """
-    payload = {"query": query, "top_k": top_k, "p": p}
+    if mode == SEARCH_MODE_SEMANTIC:
+        endpoint = "/search/semantic"
+        payload: dict = {"query": query, "top_k": top_k}
+    elif mode == SEARCH_MODE_HYBRID:
+        endpoint = "/search/hybrid"
+        payload = {"query": query, "top_k": top_k, "alpha": alpha, "p": p}
+    else:
+        endpoint = "/search"
+        payload = {"query": query, "top_k": top_k, "p": p}
+
     owns_client = client is None
     http = client or httpx.Client(base_url=api_url, timeout=10.0)
     try:
-        response = http.post("/search", json=payload)
+        response = http.post(endpoint, json=payload)
         response.raise_for_status()
         parsed = SearchResponse.model_validate(response.json())
         return parsed.results
@@ -92,34 +117,67 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
 
     st.set_page_config(page_title="Smart Tourism Engine", page_icon=":mag:")
     st.title("Smart Tourism Engine")
-    st.caption("MVP — Booleano Extendido (p-norm)")
+    st.caption("Booleano Extendido · Semantico · Hibrido")
 
     with st.sidebar:
-        st.header("Parámetros")
+        st.header("Modo de busqueda")
+        mode = st.radio(
+            "Modo",
+            options=SEARCH_MODES,
+            index=0,
+            help=(
+                "Booleano Extendido: rankeo lexico p-norm. "
+                "Semantico: embeddings en Qdrant. "
+                "Hibrido: combinacion de ambos con peso alpha."
+            ),
+        )
+
+        st.header("Parametros")
         top_k = st.slider(
             "top_k",
             min_value=TOP_K_MIN,
             max_value=TOP_K_MAX,
             value=DEFAULT_TOP_K,
             step=1,
-            help="Número máximo de destinos a devolver.",
+            help="Numero maximo de destinos a devolver.",
         )
-        p = st.slider(
-            "p (norma)",
-            min_value=P_MIN,
-            max_value=P_MAX,
-            value=DEFAULT_P,
-            step=0.5,
-            help=(
-                "Norma-p del Booleano Extendido. p=1 → vectorial (AND/OR "
-                "blandos); p→∞ → Booleano puro (AND/OR estrictos)."
-            ),
-        )
+
+        p = DEFAULT_P
+        alpha = DEFAULT_ALPHA
+
+        if mode in (SEARCH_MODE_BOOLEAN, SEARCH_MODE_HYBRID):
+            p = st.slider(
+                "p (norma)",
+                min_value=P_MIN,
+                max_value=P_MAX,
+                value=DEFAULT_P,
+                step=0.5,
+                help=(
+                    "Norma-p del Booleano Extendido. p=1 → vectorial (AND/OR "
+                    "blandos); p→inf → Booleano puro (AND/OR estrictos)."
+                ),
+            )
+
+        if mode == SEARCH_MODE_HYBRID:
+            alpha = st.slider(
+                "alpha",
+                min_value=ALPHA_MIN,
+                max_value=ALPHA_MAX,
+                value=DEFAULT_ALPHA,
+                step=0.05,
+                help=(
+                    "Peso de la rama lexica. alpha=1.0 → solo Booleano "
+                    "Extendido; alpha=0.0 → solo semantico."
+                ),
+            )
 
     query = st.text_input(
         "Consulta",
-        placeholder="playa AND España",
-        help="Usa AND/OR en mayúsculas para combinar términos.",
+        placeholder="playa AND España" if mode == SEARCH_MODE_BOOLEAN else "playas del caribe",
+        help=(
+            "Usa AND/OR en mayusculas para el modo Booleano. "
+            "En modo Semantico o Hibrido escribe en lenguaje natural."
+        ),
     )
     search_clicked = st.button("Buscar", type="primary")
 
@@ -128,7 +186,7 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
             st.warning("Escribe una consulta antes de buscar.")
             return
         try:
-            results = search_destinations(query, top_k=top_k, p=p)
+            results = search_destinations(query, mode=mode, top_k=top_k, p=p, alpha=alpha)
         except httpx.HTTPError as exc:
             st.error(f"Error al consultar la API ({API_URL}): {exc}")
             return
@@ -137,7 +195,7 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
             st.info("Sin resultados para esta consulta.")
             return
 
-        st.subheader(f"{len(results)} resultado(s)")
+        st.subheader(f"{len(results)} resultado(s) — modo: {mode}")
         for rank, hit in enumerate(results, start=1):
             _render_card(st, rank, hit)
 
