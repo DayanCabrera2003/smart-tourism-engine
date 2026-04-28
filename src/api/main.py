@@ -155,6 +155,15 @@ def _default_rag_pipeline() -> "RagPipeline":
         ollama_url=settings.OLLAMA_URL,
         ollama_model=settings.OLLAMA_MODEL,
     )
+
+    web_client = None
+    if settings.TAVILY_API_KEY:
+        from src.web_search.tavily import TavilyClient
+        web_client = TavilyClient(
+            settings.TAVILY_API_KEY,
+            max_calls_per_minute=settings.TAVILY_RATE_LIMIT_PER_MINUTE,
+        )
+
     return RagPipeline(
         index=_load_index_from_disk(),
         embedder=_default_embedder(),
@@ -162,6 +171,7 @@ def _default_rag_pipeline() -> "RagPipeline":
         collection=DEFAULT_COLLECTION,
         destinations=_load_destinations_from_disk(),
         llm=llm,
+        web_client=web_client,
     )
 
 
