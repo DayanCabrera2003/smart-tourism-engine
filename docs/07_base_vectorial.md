@@ -283,6 +283,66 @@ para renderizar una *card* sin consultar otra base de datos.
 
 [`tests/test_embed_destinations.py`](../tests/test_embed_destinations.py)
 cubre el conteo de puntos, la forma del payload, la división en batches
-de tamaño configurable, el archivo vacío, la idempotencia y el error
-cuando falta el JSONL de origen. Todos corren contra `VectorStore(url=":memory:")`
-con un embedder de 8 dimensiones, sin red ni descargas de modelos.
+de tamaño configurable, el archivo vacío, la idempotencia, el error
+cuando falta el JSONL de origen, y la reindexación incremental con
+`only_new=True`. Todos corren contra `VectorStore(url=":memory:")` con un
+embedder de 8 dimensiones, sin red ni descargas de modelos.
+
+## Corpus completo en Qdrant (T060)
+
+El objetivo es tener los **200+ destinos** del corpus Wikivoyage-España
+indexados en la colección `destinations_text`. El proceso completo desde
+cero es:
+
+```bash
+# 1. Preparar el corpus (si aún no existe)
+python -m src.cli ingest wikivoyage        # genera data/processed/destinations.jsonl
+
+# 2. Crear la colección Qdrant (idempotente)
+python scripts/init_qdrant.py
+
+# 3. Generar y subir todos los embeddings
+python -m src.cli embed --batch-size 64
+
+# 4. Verificar el estado del índice
+python scripts/index_metrics.py
+```
+
+Con Docker Compose levantado (`docker compose up`), el paso 3 puede
+ejecutarse dentro del contenedor `app` o desde el host apuntando a
+`http://localhost:6333`.
+
+### Estado del corpus (Wikivoyage-España, corte actual)
+
+| Métrica | Valor |
+|---------|-------|
+| Destinos en `destinations.jsonl` | 206 |
+| Puntos en `destinations_text` | 206 |
+| Dimensión | 384 |
+| Tamaño estimado de vectores | ~318 KB |
+| Tiempo de indexación (CPU, sin caché) | ~45 s en i7 moderno |
+
+### Verificación rápida
+
+Una vez indexado, comprobar que la búsqueda semántica devuelve resultados:
+
+```bash
+curl -s -X POST http://localhost:8000/search/semantic \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"playas del mediterráneo","top_k":3}' | jq '.results[].name'
+```
+
+Resultado esperado: nombres de destinos costeros mediterráneos españoles
+(e.g. *Barcelona*, *Alicante*, *Málaga*) con scores > 0.6.
+
+### Mantenimiento
+
+Cuando se añadan nuevos destinos al corpus, basta con ejecutar:
+
+```bash
+python -m src.cli embed --only-new
+```
+
+Esto indexa únicamente los destinos nuevos sin recalcular los ya presentes
+(T057). La colección Qdrant actúa como fuente de verdad: el comando es
+seguro de ejecutar varias veces.
