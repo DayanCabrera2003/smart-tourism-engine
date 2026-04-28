@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 __all__ = ["RagPipeline"]
 
 _CACHE_MAX = 128
+_FALLBACK_THRESHOLD = 0.30
 
 _LOW_CONFIDENCE_PATTERNS = (
     "no tengo suficiente",
@@ -47,6 +48,7 @@ class RagPipeline:
         collection: str,
         destinations: dict[str, dict[str, Any]],
         llm: Any,
+        web_client: Any | None = None,
     ) -> None:
         self._index = index
         self._embedder = embedder
@@ -54,6 +56,7 @@ class RagPipeline:
         self._collection = collection
         self._destinations = destinations
         self._llm = llm
+        self._web_client = web_client
         self._cache: dict[str, AskResponse] = {}
 
     def answer(
@@ -75,7 +78,13 @@ class RagPipeline:
                 low_confidence=cached.low_confidence,
             )
 
+        from src.web_search.trigger import should_fallback
+
         hits = self._retrieve(query, top_k=top_k, mode=mode, alpha=alpha)
+        if self._web_client is not None and should_fallback(
+            hits, threshold=_FALLBACK_THRESHOLD
+        ):
+            hits = self._web_fallback(query, hits)
         sources = self._hits_to_results(hits)
         context = build_context(sources)
         prompt = build_prompt(query, context)
@@ -125,6 +134,38 @@ class RagPipeline:
             {"sources": [s.model_dump() for s in sources], "low_confidence": low_conf}
         )
 
+    def _web_fallback(
+        self, query: str, existing_hits: list[tuple[str, float]]
+    ) -> list[tuple[str, float]]:
+        """Consulta Tavily y devuelve hits locales + resultados web."""
+        from src.web_search.converter import web_result_to_destination
+        from src.web_search.persister import persist_web_destination
+
+        try:
+            web_results = self._web_client.search(query, max_results=5)
+        except RuntimeError:
+            return existing_hits
+
+        extra_hits: list[tuple[str, float]] = []
+        for wr in web_results:
+            dest = web_result_to_destination(wr)
+            persist_web_destination(
+                dest,
+                embedder=self._embedder,
+                store=self._store,
+                collection=self._collection,
+            )
+            self._destinations[dest.id] = {
+                "name": dest.name,
+                "country": dest.country,
+                "description": dest.description,
+                "image_urls": [],
+                "from_web": True,
+            }
+            extra_hits.append((dest.id, 0.5))
+
+        return existing_hits + extra_hits
+
     def _retrieve(
         self, query: str, *, top_k: int, mode: str, alpha: float
     ) -> list[tuple[str, float]]:
@@ -164,6 +205,7 @@ class RagPipeline:
                     country=meta.get("country"),
                     description=meta.get("description"),
                     image_urls=list(meta.get("image_urls") or []),
+                    from_web=bool(meta.get("from_web", False)),
                 )
             )
         return results
