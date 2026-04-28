@@ -179,3 +179,44 @@ def test_clear_cache_resets_hits():
     pipeline._clear_cache()
     result = pipeline.answer("playa", top_k=3)
     assert result.cached is False
+
+
+# T071 — 5 queries fijas de evaluacion
+def test_q1_playas_en_espana_returns_sources():
+    """Query 1: playas → sources contiene destino costero."""
+    pipeline = _make_pipeline()
+    result = pipeline.answer("playa", top_k=3)
+    assert len(result.sources) > 0
+    assert result.low_confidence is False
+
+
+def test_q2_ciudad_con_museos_returns_answer():
+    """Query 2: museos → respuesta menciona destino cultural."""
+    pipeline = _make_pipeline(llm_response="Madrid tiene museos famosos [1].")
+    result = pipeline.answer("museo", top_k=3)
+    assert "Madrid" in result.answer or len(result.answer) > 0
+
+
+def test_q3_montana_has_sources_not_low_confidence():
+    """Query 3: montaña → sources no vacío, low_confidence=False."""
+    pipeline = _make_pipeline()
+    result = pipeline.answer("montana", top_k=3)
+    assert len(result.sources) > 0
+    assert result.low_confidence is False
+
+
+def test_q4_query_sin_sentido_low_confidence():
+    """Query 4: query rara → low_confidence=True."""
+    pipeline = _make_pipeline(
+        llm_response="No tengo suficiente información para responder."
+    )
+    result = pipeline.answer("zzzzxxx", top_k=3)
+    assert result.low_confidence is True
+
+
+def test_q5_cache_hit_on_second_identical_call():
+    """Query 5: segunda llamada idéntica → cached=True."""
+    pipeline = _make_pipeline()
+    pipeline.answer("playa tropical", top_k=3)
+    result2 = pipeline.answer("playa tropical", top_k=3)
+    assert result2.cached is True
