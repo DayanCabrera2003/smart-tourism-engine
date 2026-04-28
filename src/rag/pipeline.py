@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Generator
 from typing import TYPE_CHECKING, Any
 
 from src.api.schemas import AskResponse, DestinationResult
@@ -67,13 +68,12 @@ class RagPipeline:
         context = build_context(sources)
         prompt = build_prompt(query, context)
         answer_text = self._llm.generate(prompt)
-        low_conf = False
 
         response = AskResponse(
             answer=answer_text,
             sources=sources,
             cached=False,
-            low_confidence=low_conf,
+            low_confidence=False,
         )
         if len(self._cache) >= _CACHE_MAX:
             oldest = next(iter(self._cache))
@@ -91,7 +91,7 @@ class RagPipeline:
         top_k: int = 5,
         mode: str = "hybrid",
         alpha: float = 0.5,
-    ):
+    ) -> Generator[str, None, None]:
         """Itera sobre tokens y emite el evento final JSON con fuentes.
 
         VERSION PRELIMINAR: low_confidence siempre False, sin acumulacion de tokens.

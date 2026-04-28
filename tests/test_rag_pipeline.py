@@ -65,9 +65,24 @@ def _build_store() -> VectorStore:
 
 
 _DESTINATIONS = {
-    "doc-playa": {"name": "Ibiza", "country": "Espana", "description": "Isla con playas.", "image_urls": []},
-    "doc-museo": {"name": "Madrid", "country": "Espana", "description": "Ciudad con museos.", "image_urls": []},
-    "doc-montana": {"name": "Picos de Europa", "country": "Espana", "description": "Montana y naturaleza.", "image_urls": []},
+    "doc-playa": {
+        "name": "Ibiza",
+        "country": "Espana",
+        "description": "Isla con playas.",
+        "image_urls": [],
+    },
+    "doc-museo": {
+        "name": "Madrid",
+        "country": "Espana",
+        "description": "Ciudad con museos.",
+        "image_urls": [],
+    },
+    "doc-montana": {
+        "name": "Picos de Europa",
+        "country": "Espana",
+        "description": "Montana y naturaleza.",
+        "image_urls": [],
+    },
 }
 
 
