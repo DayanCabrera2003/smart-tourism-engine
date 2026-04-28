@@ -15,6 +15,8 @@ T053 — Expone ``POST /search/semantic`` que embebe la consulta y consulta
        la colección ``destinations_text`` de Qdrant directamente.
 T055 — Expone ``POST /search/hybrid`` que combina Booleano Extendido y
        semántico con peso ``alpha`` configurable.
+T065 — Expone ``POST /ask`` que delega en ``RagPipeline`` para responder
+       preguntas en lenguaje natural con contexto recuperado.
 """
 from __future__ import annotations
 
