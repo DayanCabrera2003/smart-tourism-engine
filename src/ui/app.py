@@ -327,8 +327,11 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
         _render_image_tab(st, top_k=top_k)
 
 
+IMAGE_GALLERY_THRESHOLD = 3
+
+
 def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no cover - Streamlit
-    """Renderiza un destino como tarjeta con nombre, país, descripción y score (T044)."""
+    """Renderiza un destino como tarjeta con nombre, país, descripción y score (T044/T087)."""
     with st.container(border=True):
         header, score_col = st.columns([6, 1])
         title = format_result_header(hit)
@@ -339,15 +342,34 @@ def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no c
             meta_bits.append(f":earth_americas: {hit.country}")
         meta_bits.append(f"`{hit.id}`")
         header.caption(" · ".join(meta_bits))
-        cover = pick_cover_image(hit.image_urls)
-        if cover:
-            try:
-                st.image(cover, use_container_width=True)
-            except Exception:
-                st.caption(":frame_with_picture: Imagen no disponible.")
+        _render_image_gallery(st, hit.image_urls)
         description = truncate_description(hit.description)
         if description:
             st.write(description)
+
+
+def _render_image_gallery(st, image_urls: list[str] | None) -> None:  # pragma: no cover
+    """Muestra las imágenes del destino (T087).
+
+    Si hay 1 imagen, la muestra a ancho completo.
+    Si hay varias, las muestra en un grid de hasta 3 columnas.
+    """
+    valid_urls = [u for u in (image_urls or []) if isinstance(u, str) and u.strip()]
+    if not valid_urls:
+        return
+    if len(valid_urls) == 1:
+        try:
+            st.image(valid_urls[0], use_container_width=True)
+        except Exception:
+            st.caption("Imagen no disponible.")
+        return
+    cols = st.columns(min(len(valid_urls), IMAGE_GALLERY_THRESHOLD))
+    for idx, url in enumerate(valid_urls[: IMAGE_GALLERY_THRESHOLD * 2]):
+        col = cols[idx % IMAGE_GALLERY_THRESHOLD]
+        try:
+            col.image(url, use_container_width=True)
+        except Exception:
+            col.caption("N/D")
 
 
 def _render_ask_tab(st, *, top_k: int, mode: str, alpha: float) -> None:  # pragma: no cover
