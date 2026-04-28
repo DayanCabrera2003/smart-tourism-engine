@@ -44,11 +44,21 @@ DEFAULT_ALPHA = 0.5
 ALPHA_MIN = 0.0
 ALPHA_MAX = 1.0
 
+WEB_BADGE = "[Busqueda web]"
+
 _SEARCH_MODE_TO_API = {
     SEARCH_MODE_BOOLEAN: "boolean",
     SEARCH_MODE_SEMANTIC: "semantic",
     SEARCH_MODE_HYBRID: "hybrid",
 }
+
+
+def format_result_header(result: DestinationResult) -> str:
+    """Devuelve el titulo de la tarjeta con badge si el resultado es web (T078)."""
+    name = result.name or result.id
+    if result.from_web:
+        return f"{name} {WEB_BADGE}"
+    return name
 
 
 def pick_cover_image(image_urls: list[str] | None) -> str | None:
@@ -273,7 +283,7 @@ def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no c
     """Renderiza un destino como tarjeta con nombre, país, descripción y score (T044)."""
     with st.container(border=True):
         header, score_col = st.columns([6, 1])
-        title = hit.name or hit.id
+        title = format_result_header(hit)
         header.markdown(f"### {rank}. {title}")
         score_col.metric(label="score", value=f"{hit.score:.3f}")
         meta_bits: list[str] = []
@@ -340,7 +350,7 @@ def _render_ask_tab(st, *, top_k: int, mode: str, alpha: float) -> None:  # prag
             st.caption("Fuentes utilizadas:")
             for i, raw in enumerate(sources_raw, start=1):
                 src = DestinationResult.model_validate(raw)
-                label = f"[{i}] {src.name or src.id}"
+                label = f"[{i}] {format_result_header(src)}"
                 if src.country:
                     label += f" — {src.country}"
                 with st.expander(label):
