@@ -145,3 +145,37 @@ def test_context_numbers_match_sources():
     assert len(result.sources) >= 1
     first_source = result.sources[0]
     assert first_source.id is not None
+
+
+# T070 — Tests de cache
+def test_cache_hit_on_repeated_query():
+    pipeline = _make_pipeline()
+    result1 = pipeline.answer("playa", top_k=3)
+    result2 = pipeline.answer("playa", top_k=3)
+    assert result1.cached is False
+    assert result2.cached is True
+
+
+def test_different_top_k_produces_different_cache_key():
+    pipeline = _make_pipeline()
+    pipeline.answer("playa", top_k=3)
+    r2 = pipeline.answer("playa", top_k=5)
+    assert r2.cached is False
+
+
+def test_low_confidence_responses_not_cached():
+    pipeline = _make_pipeline(
+        llm_response="No tengo suficiente información para responder."
+    )
+    r1 = pipeline.answer("zzzzxxx", top_k=3)
+    r2 = pipeline.answer("zzzzxxx", top_k=3)
+    assert r1.low_confidence is True
+    assert r2.cached is False
+
+
+def test_clear_cache_resets_hits():
+    pipeline = _make_pipeline()
+    pipeline.answer("playa", top_k=3)
+    pipeline._clear_cache()
+    result = pipeline.answer("playa", top_k=3)
+    assert result.cached is False
