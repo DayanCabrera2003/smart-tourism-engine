@@ -119,3 +119,18 @@ class SearchResponse(BaseModel):
         default_factory=list,
         description="Destinos ordenados de mayor a menor score.",
     )
+
+
+class AskResponse(BaseModel):
+    """Respuesta del pipeline RAG (T064)."""
+
+    answer: str = Field(..., description="Texto generado por el LLM.")
+    sources: list[DestinationResult] = Field(
+        default_factory=list,
+        description="Destinos recuperados usados como contexto.",
+    )
+    cached: bool = Field(False, description="True si la respuesta proviene del cache.")
+    low_confidence: bool = Field(
+        False,
+        description="True si el LLM no encontro informacion suficiente en el contexto.",
+    )
