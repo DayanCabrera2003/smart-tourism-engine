@@ -23,13 +23,18 @@ import pickle
 from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
+
+if TYPE_CHECKING:
+    from src.rag.pipeline import RagPipeline
 
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy import select
 
 from src.api import middleware
 from src.api.schemas import (
+    AskRequest,
+    AskResponse,
     DestinationResult,
     HybridSearchRequest,
     SearchRequest,
@@ -133,6 +138,32 @@ def _default_embedder() -> TextEmbedder:
 def get_embedder() -> TextEmbedder:
     """Provee el embedder de texto (T053).  Inyectable en tests."""
     return _default_embedder()
+
+
+@lru_cache(maxsize=1)
+def _default_rag_pipeline() -> "RagPipeline":
+    from src.rag.llm_client import LLMClient
+    from src.rag.pipeline import RagPipeline
+
+    llm = LLMClient(
+        provider=settings.LLM_PROVIDER,
+        api_key=settings.LLM_API_KEY,
+        ollama_url=settings.OLLAMA_URL,
+        ollama_model=settings.OLLAMA_MODEL,
+    )
+    return RagPipeline(
+        index=_load_index_from_disk(),
+        embedder=_default_embedder(),
+        store=_default_vector_store(),
+        collection=DEFAULT_COLLECTION,
+        destinations=_load_destinations_from_disk(),
+        llm=llm,
+    )
+
+
+def get_rag_pipeline() -> "RagPipeline":
+    """Provee el pipeline RAG. Inyectable en tests."""
+    return _default_rag_pipeline()
 
 
 def get_semantic_collection() -> str:
@@ -254,3 +285,17 @@ def search_hybrid(
             )
         )
     return SearchResponse(results=results)
+
+
+RagPipelineDep = Annotated["RagPipeline", Depends(get_rag_pipeline)]
+
+
+@app.post("/ask", response_model=AskResponse)
+def ask(request: AskRequest, pipeline: RagPipelineDep) -> AskResponse:
+    """Responde una pregunta en lenguaje natural usando RAG (T065)."""
+    return pipeline.answer(
+        request.query,
+        top_k=request.top_k,
+        mode=request.mode,
+        alpha=request.alpha,
+    )

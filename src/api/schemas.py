@@ -134,3 +134,21 @@ class AskResponse(BaseModel):
         False,
         description="True si el LLM no encontro informacion suficiente en el contexto.",
     )
+
+
+class AskRequest(BaseModel):
+    """Cuerpo del ``POST /ask`` y ``POST /ask/stream``."""
+
+    query: str = Field(..., min_length=1, description="Pregunta en lenguaje natural.")
+    top_k: int = Field(5, ge=1, le=50, description="Destinos a recuperar como contexto.")
+    mode: str = Field(
+        "hybrid",
+        pattern="^(boolean|semantic|hybrid)$",
+        description="Modo de recuperación: boolean, semantic o hybrid.",
+    )
+    alpha: float = Field(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description="Peso de la rama léxica en modo hybrid.",
+    )
