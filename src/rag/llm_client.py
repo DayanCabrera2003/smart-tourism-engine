@@ -1,7 +1,6 @@
 """T061 -- Cliente LLM: abstraccion sobre Gemini y Ollama."""
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -79,6 +78,8 @@ class LLMClient:
         return response.json().get("response", "")
 
     def _ollama_stream(self, prompt: str) -> Iterator[str]:
+        import json
+
         import httpx
         with httpx.stream(
             "POST",
