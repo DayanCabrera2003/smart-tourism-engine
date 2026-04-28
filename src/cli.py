@@ -1,4 +1,6 @@
 
+from pathlib import Path
+
 import typer
 
 from src.config import settings
@@ -77,6 +79,49 @@ def embed_cmd(
     except FileNotFoundError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
+
+
+@app.command("embed-images")
+def embed_images_cmd(
+    images_dir: str = typer.Option(
+        None,
+        "--images-dir",
+        help="Directorio raíz de imágenes. Por defecto data/raw/images.",
+    ),
+    batch_size: int = typer.Option(
+        32, "--batch-size", min=1, help="Tamaño del batch de upsert a Qdrant."
+    ),
+    collection: str = typer.Option(
+        None, "--collection", help="Nombre de la colección Qdrant (default: destinations_image)."
+    ),
+    only_new: bool = typer.Option(
+        False,
+        "--only-new",
+        help="Solo indexa imágenes que aún no tienen embedding en Qdrant.",
+    ),
+):
+    """Genera embeddings CLIP de imágenes y los sube a Qdrant (T083)."""
+    from src.indexing.vector_store import VectorStore
+    from src.multimodal.clip_embedder import ClipEmbedder
+    from src.multimodal.image_indexer import IMAGE_COLLECTION, embed_images
+
+    dir_path = (
+        settings.DATA_DIR / "raw" / "images"
+        if images_dir is None
+        else Path(images_dir)
+    )
+    coll = collection or IMAGE_COLLECTION
+
+    total = embed_images(
+        dir_path,
+        VectorStore(),
+        ClipEmbedder(),
+        collection=coll,
+        batch_size=batch_size,
+        only_new=only_new,
+    )
+    mode = "nuevas" if only_new else "total"
+    typer.echo(f"Embeddings de imágenes subidos a '{coll}': {total} puntos ({mode}).")
 
 
 @ingest_app.command("wikivoyage")
