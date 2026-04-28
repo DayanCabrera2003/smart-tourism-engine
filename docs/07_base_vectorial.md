@@ -179,6 +179,45 @@ escribe a disco. Esto evita I/O por cada petición en un servidor web y
 permite decidir, por ejemplo, persistir solo al terminar un lote de embeddings
 (como en el comando `embed`).
 
+## Métricas de calidad del índice vectorial (T058)
+
+El script [`scripts/index_metrics.py`](../scripts/index_metrics.py) reporta el
+estado de la colección Qdrant sin necesitar una instancia externa cuando se
+ejecuta con el cliente en memoria (útil para tests):
+
+```bash
+# Contra el Qdrant levantado en Docker Compose
+python scripts/index_metrics.py
+
+# Contra una URL explícita
+python scripts/index_metrics.py --url http://localhost:6333
+
+# Contra otra colección
+python scripts/index_metrics.py --collection destinations_image
+```
+
+Salida típica para el corpus completo:
+
+```
+Coleccion        : destinations_text
+Estado           : green
+Puntos           : 206
+Vectores indexados: 206
+Dimension        : 384
+Metrica          : Distance.Cosine
+Tamaño vectores  : 317.8 KB
+```
+
+Las métricas reportadas son:
+
+| Campo | Descripción |
+|-------|-------------|
+| `points_count` | Número total de puntos en la colección. |
+| `indexed_vectors_count` | Vectores indexados y listos para búsqueda. |
+| `vector_dimension` | Tamaño del vector (384 para `all-MiniLM-L6-v2`). |
+| `distance_metric` | Métrica de distancia configurada (Cosine). |
+| `vectors_size_bytes` | Estimación del tamaño en bytes: `N × dim × 4`. |
+
 ## Reindexación incremental (T057)
 
 El comando CLI acepta la bandera `--only-new` para procesar solo los destinos
