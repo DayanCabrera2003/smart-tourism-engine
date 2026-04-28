@@ -40,9 +40,6 @@ data/eval/
 .vscode/
 .idea/
 
-# Docker
-.dockerignore
-
 # Project specific
 *.log
 docs/_build/

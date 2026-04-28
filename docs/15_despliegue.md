@@ -6,7 +6,7 @@ Este documento detalla los requisitos técnicos y los pasos necesarios para desp
 
 ### Software Base
 - **Python**: Versión 3.11 o superior.
-- **Docker & Docker Compose**: Necesarios para el despliegue de la base vectorial (Qdrant) y la contenedorización de la aplicación.
+- **Qdrant**: Binario local para la base vectorial (ver sección de instalación).
 - **Git**: Para el control de versiones y gestión del código fuente.
 
 ## Instalación del Entorno de Desarrollo
@@ -64,63 +64,38 @@ cp .env.example .env
 ```
 Y edita los valores según sea necesario.
 
-## Imagen Docker
+## Arranque local del sistema
 
-El sistema está diseñado para ejecutarse en contenedores Docker, lo que garantiza la portabilidad y la consistencia entre entornos.
+Con las dependencias instaladas y el corpus procesado, el sistema se levanta con dos procesos:
 
-- **Imagen Base**: `python:3.11-slim`. Se ha elegido la variante `slim` para minimizar el tamaño de la imagen final y reducir la superficie de ataque, manteniendo solo lo esencial para ejecutar Python.
-- **Optimización de Capas**:
-  1. Instalación de dependencias del sistema mínimas.
-  2. Copia e instalación de dependencias de Python (aprovechando la caché de Docker).
-  3. Copia del código fuente del proyecto.
-- **Variables de Entorno**: El contenedor respeta las variables pasadas durante el `docker run` o vía `docker-compose`.
-
-Para construir la imagen localmente:
 ```bash
-docker build -t smart-tourism-engine -f docker/Dockerfile .
+# Terminal 1 — API FastAPI
+uvicorn src.api.main:app --reload
+
+# Terminal 2 — UI Streamlit
+streamlit run src/ui/app.py
 ```
 
-## Orquestación con Docker Compose
+La API queda disponible en `http://localhost:8000` y la UI en `http://localhost:8501`.
 
-El despliegue completo se gestiona con `docker-compose.yml`, que orquestra los siguientes servicios:
+### Qdrant local
 
-```mermaid
-graph TD
-    User([Usuario]) --> UI[Servicio: ui - Streamlit 8501]
-    UI --> App[Servicio: app - FastAPI 8000]
-    App --> Qdrant[Servicio: qdrant]
-    App --> SQLite[(Persistencia: SQLite)]
-    Qdrant --> VolQ[(Volumen: qdrant_storage)]
+Qdrant se ejecuta como proceso independiente. Descarga el binario desde
+[qdrant.tech/documentation/guides/installation](https://qdrant.tech/documentation/guides/installation/)
+y arráncalo con:
+
+```bash
+./qdrant
 ```
 
-- **`app`**: expone la API FastAPI en `:8000`. Arranca con
-  `uvicorn src.api.main:app`.
-- **`ui`**: levanta la UI de Streamlit (T046) en `:8501` y consume la API vía
-  `SMART_TOURISM_API_URL=http://app:8000`. Tras `docker compose up` la
-  interfaz queda disponible en `http://localhost:8501`.
-- **`qdrant`**: base vectorial, compartida por `app`.
+Por defecto escucha en `http://localhost:6333`, que coincide con el valor de
+`QDRANT_URL` en `.env`.
 
-### Comandos de gestión
+### Persistencia de datos
 
-- **Iniciar el sistema**:
-  ```bash
-  docker compose up -d --build
-  ```
-
-- **Ver logs**:
-  ```bash
-  docker compose logs -f app
-  ```
-
-- **Detener el sistema**:
-  ```bash
-  docker compose down
-  ```
-
-### Persistencia de Datos
-Se han configurado los siguientes volúmenes para asegurar que la información no se pierda al reiniciar contenedores:
-- `./data/qdrant_storage`: Persistencia de los vectores en Qdrant.
-- `./data`: Persistencia del catálogo SQLite y archivos procesados en el contenedor de la aplicación.
+- `data/processed/destinations.db`: catálogo SQLite.
+- `data/processed/index.pkl`: índice invertido.
+- `data/processed/qdrant/`: vectores de Qdrant (si se configura `--storage-path`).
 
 ## Despliegue offline (Ollama) — T072
 
@@ -134,4 +109,4 @@ Para usar el sistema sin conexión a internet, configura Ollama como proveedor L
    OLLAMA_URL=http://localhost:11434
    OLLAMA_MODEL=llama3
    ```
-4. Levanta el sistema: `docker compose up`
+4. Levanta la API: `uvicorn src.api.main:app --reload`

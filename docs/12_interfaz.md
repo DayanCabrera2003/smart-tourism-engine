@@ -26,8 +26,7 @@ búsqueda.
   `httpx.Client` inyectable. Esto permite testearla sin levantar el runtime de
   Streamlit (ver [`tests/test_ui_app.py`](../tests/test_ui_app.py)).
 - La URL de la API se configura con la variable de entorno
-  `SMART_TOURISM_API_URL` (por defecto `http://localhost:8000`), lo que
-  facilita montar el servicio en Docker Compose (T046).
+  `SMART_TOURISM_API_URL` (por defecto `http://localhost:8000`).
 
 ### Ejecución local
 
@@ -162,10 +161,10 @@ se refleja en el ranking inmediatamente sin reiniciar la API.
 ## T048 — Demo Corte 1 (end-to-end)
 
 Esta sección describe el flujo de demo que cierra el **Corte 1**: levantar
-el stack con Docker Compose, abrir la UI en el navegador y ejecutar una
-búsqueda de ejemplo (`playa España`) que recorre toda la pila — UI →
-FastAPI → recuperador Booleano Extendido → índice invertido → metadatos
-SQLite — y devuelve tarjetas renderizadas en Streamlit.
+el sistema localmente, abrir la UI en el navegador y ejecutar una búsqueda
+de ejemplo (`playa España`) que recorre toda la pila — UI → FastAPI →
+recuperador Booleano Extendido → índice invertido → metadatos SQLite — y
+devuelve tarjetas renderizadas en Streamlit.
 
 ### Prerrequisitos
 
@@ -178,19 +177,22 @@ python -m src.cli build-index         # genera index.pkl
 ```
 
 Esto produce 206 destinos (Wikivoyage España) y un índice invertido con
-~4 100 términos. El compose monta `./data` como volumen, así que los
-artefactos quedan disponibles para los contenedores `app` y `ui`.
+~4 100 términos.
 
 ### Pasos de la demo
 
-1. **Levantar el stack**:
+1. **Levantar la API y la UI**:
 
    ```bash
-   docker compose up --build
+   # Terminal 1:
+   uvicorn src.api.main:app --reload
+
+   # Terminal 2:
+   streamlit run src/ui/app.py
    ```
 
-   Espera a ver `Uvicorn running on 0.0.0.0:8000` (servicio `app`) y
-   `You can now view your Streamlit app` (servicio `ui`).
+   Espera a ver `Uvicorn running on http://127.0.0.1:8000` y
+   `You can now view your Streamlit app in your browser`.
 
 2. **Abrir la UI** en [http://localhost:8501](http://localhost:8501).
 
@@ -230,7 +232,7 @@ fallback.
 
 > **Hito**: con esta demo reproducible queda cerrado el **Corte 1**
 > (T001 – T048): ingestión + indexación + recuperador Booleano Extendido
-> + API + UI Streamlit en Docker Compose.
+> + API + UI Streamlit.
 
 ## T055 — Selector de modo y slider de alpha
 

@@ -2,22 +2,21 @@
 
 La Fase 4 incorpora una **base de datos vectorial** para soportar búsqueda
 semántica sobre las descripciones de los destinos. La elección recae en
-[Qdrant](https://qdrant.tech/), desplegado como contenedor Docker dentro del
-mismo `docker-compose` del proyecto.
+[Qdrant](https://qdrant.tech/), ejecutado localmente como proceso independiente.
 
 ## ¿Por qué Qdrant?
 
 | Criterio | Qdrant | Alternativas |
 |----------|--------|--------------|
 | Licencia | Apache-2.0 | FAISS (MIT, sólo librería), Milvus (Apache-2.0, pesado), Pinecone (SaaS, propietario) |
-| Despliegue | Binario único o Docker; modo embebido `:memory:` para tests | FAISS no expone API HTTP; Milvus requiere etcd + MinIO |
+| Despliegue | Binario único; modo embebido `:memory:` para tests | FAISS no expone API HTTP; Milvus requiere etcd + MinIO |
 | API | REST + gRPC + cliente Python tipado | Pinecone sólo SaaS; FAISS sólo Python/C++ |
 | Filtros + payload | Sí, ricos y combinables con la búsqueda vectorial | FAISS necesita indexación externa para metadata |
 | Persistencia | En disco con snapshots | FAISS requiere lógica propia |
 
-Para un proyecto académico que ya corre Docker Compose, Qdrant es el equilibrio
-adecuado: **open-source, ligero, persistente y con cliente Python de primera
-clase** que también ofrece un modo en memoria ideal para los tests.
+Para un proyecto académico, Qdrant es el equilibrio adecuado: **open-source,
+ligero, persistente y con cliente Python de primera clase** que también ofrece
+un modo en memoria ideal para los tests.
 
 ## Cliente: `VectorStore`
 
@@ -53,9 +52,8 @@ hits = store.search("destinations_text", query_vector, top_k=5)
 ### Configuración
 
 La URL del servidor se toma de `settings.QDRANT_URL`
-(por defecto `http://localhost:6333`, sobreescrita a `http://qdrant:6333`
-dentro de Docker Compose). En tests se inyecta `url=":memory:"`, lo que
-arranca un Qdrant embebido sin red.
+(por defecto `http://localhost:6333`, configurable via `.env`).
+En tests se inyecta `url=":memory:"`, lo que arranca un Qdrant embebido sin red.
 
 ## Modelo de embeddings: `TextEmbedder`
 
@@ -186,7 +184,7 @@ estado de la colección Qdrant sin necesitar una instancia externa cuando se
 ejecuta con el cliente en memoria (útil para tests):
 
 ```bash
-# Contra el Qdrant levantado en Docker Compose
+# Contra el Qdrant local (http://localhost:6333 por defecto)
 python scripts/index_metrics.py
 
 # Contra una URL explícita
@@ -308,9 +306,8 @@ python -m src.cli embed --batch-size 64
 python scripts/index_metrics.py
 ```
 
-Con Docker Compose levantado (`docker compose up`), el paso 3 puede
-ejecutarse dentro del contenedor `app` o desde el host apuntando a
-`http://localhost:6333`.
+Con Qdrant corriendo localmente, el paso 3 se ejecuta desde el host
+apuntando a `http://localhost:6333` (valor por defecto de `QDRANT_URL`).
 
 ### Estado del corpus (Wikivoyage-España, corte actual)
 

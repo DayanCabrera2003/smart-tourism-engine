@@ -54,7 +54,6 @@ El `id` de cada destino es la clave primaria en SQLite y el `id` del punto en Qd
 
 - **tests/**: Pruebas unitarias e integración para asegurar la robustez del sistema.
 - **docs/**: Documentación técnica detallada siguiendo el formato LNCS.
-- **docker/**: Configuraciones para la contenedorización del sistema.
 - **scripts/**: Utilidades para tareas administrativas y de compilación del informe.
 
 ## Endpoints de la API
