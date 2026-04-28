@@ -431,7 +431,8 @@ hits = hybrid.search("playas tranquilas", index, top_k=10)
 # → [("wikivoyage-varadero", 0.83), ...]
 ```
 
-El endpoint HTTP y el selector de modo en la UI llegan en **T055**.
+El endpoint HTTP y el selector de modo en la UI están implementados desde
+**T055** (`POST /search/hybrid`, radio buttons y slider `alpha` en el sidebar).
 
 ### Tests
 
@@ -442,3 +443,36 @@ solo en el índice léxico). Con un embedder determinista de dimensión 4
 verifica: validación de `α ∈ [0, 1]`, equivalencia con cada rama en los
 extremos (`α=1.0` / `α=0.0`), inclusión de documentos exclusivos de una
 rama, orden descendente, respeto a `top_k` y clamping a `[0, 1]`.
+
+---
+
+## Queries de prueba para la búsqueda semántica (T059)
+
+La tabla siguiente recoge cinco queries de prueba para el endpoint
+`POST /search/semantic`.  En el entorno de pruebas se usa un embedder
+determinista y un `VectorStore` en memoria; en producción el test de humo
+manual verifica que el modelo real devuelve los destinos esperados del corpus
+de Wikivoyage-España (200+ destinos).
+
+| # | Query | Resultado esperado (top-1) | Justificación semántica |
+|---|-------|---------------------------|-------------------------|
+| 1 | `beach` | Destino con descripción de playa (e.g. "Playa de…") | El vector de "beach" es ortogonal al de "mountain" y máximamente cercano a descripciones costeras. |
+| 2 | `mountain hiking snow` | Destino con descripción de montaña y nieve | "mountain", "snow" y "hiking" se agrupan en el espacio semántico de deportes de montaña. |
+| 3 | `historic city art museum` | Destino cultural / ciudad con patrimonio | Las palabras clave convergen en el vecindario semántico de turismo cultural. |
+| 4 | `tropical beach caribbean` | Destino caribeño o litoral tropical | "tropical" y "caribbean" activan el cluster de destinos de costa cálida. |
+| 5 | `rural village countryside` | Destino rural / turismo de interior | La consulta en inglés y el modelo multilingüe funcionan sobre descripciones en español. |
+
+### Cobertura de los tests automáticos
+
+[`tests/test_api_search_semantic.py`](../tests/test_api_search_semantic.py)
+verifica el comportamiento del endpoint con un embedder determinista
+inyectado vía `dependency_overrides`:
+
+- El top-1 para la query `"beach"` es `doc-beach` (score ≈ 1.0).
+- Los resultados se ordenan de mayor a menor score.
+- El payload del punto en Qdrant se propaga correctamente a `name` y `country`.
+- La descripción se enriquece desde el mapa de metadatos de `destinations.db`.
+- Se valida el rango `top_k ∈ [1, 100]` y que la query no esté vacía.
+
+Los tests de producción (queries reales sobre Wikivoyage-España) se ejecutan
+manualmente con Qdrant levantado y el corpus completo indexado (ver T060).
