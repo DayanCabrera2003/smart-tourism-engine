@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from typing import TYPE_CHECKING, Any
 
 from src.api.schemas import AskResponse, DestinationResult
@@ -106,6 +105,8 @@ class RagPipeline:
 
         for token in self._llm.generate_stream(prompt):
             yield token
+
+        import json
 
         yield "[DONE]"
         yield json.dumps(
