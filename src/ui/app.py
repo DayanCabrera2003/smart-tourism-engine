@@ -1,4 +1,4 @@
-"""T043/T044/T045/T047/T055 — Streamlit UI para consultar los endpoints de búsqueda.
+"""T043/T044/T045/T047/T055/T066 — Streamlit UI para consultar los endpoints de búsqueda.
 
 - T043: input de texto, botón de búsqueda y llamada HTTP a la API.
 - T044: cada resultado se renderiza como una tarjeta con nombre, país,
@@ -10,6 +10,8 @@
   Booleano Extendido, que se envían al backend en cada búsqueda.
 - T055: radio buttons para seleccionar el modo de búsqueda (Booleano
   Extendido / Semántico / Híbrido) y slider para el peso ``alpha``.
+- T066: añade el tab "Preguntar" con helpers ``ask_question`` y ``stream_ask``
+  que consumen ``POST /ask`` y ``POST /ask/stream`` respectivamente.
 
 La lógica de llamada HTTP y los helpers viven como funciones puras para poder
 testearlos sin necesidad de levantar el runtime de Streamlit.
@@ -20,7 +22,7 @@ import os
 
 import httpx
 
-from src.api.schemas import DestinationResult, SearchResponse
+from src.api.schemas import AskResponse, DestinationResult, SearchResponse
 
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
@@ -41,6 +43,12 @@ SEARCH_MODES = [SEARCH_MODE_BOOLEAN, SEARCH_MODE_SEMANTIC, SEARCH_MODE_HYBRID]
 DEFAULT_ALPHA = 0.5
 ALPHA_MIN = 0.0
 ALPHA_MAX = 1.0
+
+_SEARCH_MODE_TO_API = {
+    SEARCH_MODE_BOOLEAN: "boolean",
+    SEARCH_MODE_SEMANTIC: "semantic",
+    SEARCH_MODE_HYBRID: "hybrid",
+}
 
 
 def pick_cover_image(image_urls: list[str] | None) -> str | None:
@@ -112,6 +120,62 @@ def search_destinations(
             http.close()
 
 
+def ask_question(
+    query: str,
+    *,
+    top_k: int = 5,
+    mode: str = "hybrid",
+    alpha: float = DEFAULT_ALPHA,
+    api_url: str = API_URL,
+    client: httpx.Client | None = None,
+) -> AskResponse:
+    """Llama a POST /ask y devuelve la respuesta RAG completa."""
+    owns_client = client is None
+    http = client or httpx.Client(base_url=api_url, timeout=30.0)
+    try:
+        response = http.post(
+            "/ask",
+            json={"query": query, "top_k": top_k, "mode": mode, "alpha": alpha},
+        )
+        response.raise_for_status()
+        return AskResponse.model_validate(response.json())
+    finally:
+        if owns_client:
+            http.close()
+
+
+def stream_ask(
+    query: str,
+    *,
+    top_k: int = 5,
+    mode: str = "hybrid",
+    alpha: float = DEFAULT_ALPHA,
+    api_url: str = API_URL,
+):
+    """Generador que consume /ask/stream SSE y hace yield de tokens o JSON final.
+
+    Yields text tokens until a chunk starting with '{' (JSON with sources/low_confidence).
+    """
+    with httpx.stream(
+        "POST",
+        f"{api_url}/ask/stream",
+        json={"query": query, "top_k": top_k, "mode": mode, "alpha": alpha},
+        timeout=60.0,
+    ) as response:
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if not line.startswith("data:"):
+                continue
+            payload = line[len("data:"):].strip()
+            if payload == "[DONE]":
+                break
+            if payload.startswith("{"):
+                yield payload
+                break
+            if payload:
+                yield payload
+
+
 def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
     import streamlit as st
 
@@ -171,33 +235,38 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 ),
             )
 
-    query = st.text_input(
-        "Consulta",
-        placeholder="playa AND España" if mode == SEARCH_MODE_BOOLEAN else "playas del caribe",
-        help=(
-            "Usa AND/OR en mayusculas para el modo Booleano. "
-            "En modo Semantico o Hibrido escribe en lenguaje natural."
-        ),
-    )
-    search_clicked = st.button("Buscar", type="primary")
+    tab_search, tab_ask = st.tabs(["Buscar destinos", "Preguntar"])
 
-    if search_clicked:
-        if not query.strip():
-            st.warning("Escribe una consulta antes de buscar.")
-            return
-        try:
-            results = search_destinations(query, mode=mode, top_k=top_k, p=p, alpha=alpha)
-        except httpx.HTTPError as exc:
-            st.error(f"Error al consultar la API ({API_URL}): {exc}")
-            return
+    with tab_search:
+        query = st.text_input(
+            "Consulta",
+            placeholder="playa AND España" if mode == SEARCH_MODE_BOOLEAN else "playas del caribe",
+            help=(
+                "Usa AND/OR en mayusculas para el modo Booleano. "
+                "En modo Semantico o Hibrido escribe en lenguaje natural."
+            ),
+        )
+        search_clicked = st.button("Buscar", type="primary")
 
-        if not results:
-            st.info("Sin resultados para esta consulta.")
-            return
+        if search_clicked:
+            if not query.strip():
+                st.warning("Escribe una consulta antes de buscar.")
+            else:
+                try:
+                    results = search_destinations(query, mode=mode, top_k=top_k, p=p, alpha=alpha)
+                except httpx.HTTPError as exc:
+                    st.error(f"Error al consultar la API ({API_URL}): {exc}")
+                else:
+                    if not results:
+                        st.info("Sin resultados para esta consulta.")
+                    else:
+                        st.subheader(f"{len(results)} resultado(s) — modo: {mode}")
+                        for rank, hit in enumerate(results, start=1):
+                            _render_card(st, rank, hit)
 
-        st.subheader(f"{len(results)} resultado(s) — modo: {mode}")
-        for rank, hit in enumerate(results, start=1):
-            _render_card(st, rank, hit)
+    with tab_ask:
+        api_mode = _SEARCH_MODE_TO_API.get(mode, "hybrid")
+        _render_ask_tab(st, top_k=top_k, mode=api_mode, alpha=alpha)
 
 
 def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no cover - Streamlit
@@ -221,6 +290,64 @@ def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no c
         description = truncate_description(hit.description)
         if description:
             st.write(description)
+
+
+def _render_ask_tab(st, *, top_k: int, mode: str, alpha: float) -> None:  # pragma: no cover
+    """Renderiza el tab de preguntas con streaming (T066/T069)."""
+    import json
+
+    st.subheader("Pregunta al asistente turistico")
+    question = st.text_input(
+        "Pregunta",
+        placeholder="¿Qué destino de playa en España es bueno para familias?",
+        key="ask_input",
+    )
+    ask_clicked = st.button("Preguntar", type="primary", key="ask_btn")
+
+    if not ask_clicked:
+        return
+
+    if not question.strip():
+        st.warning("Escribe una pregunta antes de continuar.")
+        return
+
+    sources_json: str | None = None
+
+    def _token_gen():
+        nonlocal sources_json
+        for chunk in stream_ask(question, top_k=top_k, mode=mode, alpha=alpha):
+            if chunk.startswith("{"):
+                sources_json = chunk
+            else:
+                yield chunk
+
+    try:
+        st.write_stream(_token_gen())
+    except httpx.HTTPError as exc:
+        st.error(f"Error al consultar la API ({API_URL}): {exc}")
+        return
+
+    if not sources_json:
+        return
+
+    try:
+        data = json.loads(sources_json)
+        if data.get("low_confidence"):
+            st.warning("Informacion insuficiente en el corpus. Considera ampliar la busqueda.")
+        sources_raw = data.get("sources", [])
+        if sources_raw:
+            st.divider()
+            st.caption("Fuentes utilizadas:")
+            for i, raw in enumerate(sources_raw, start=1):
+                src = DestinationResult.model_validate(raw)
+                label = f"[{i}] {src.name or src.id}"
+                if src.country:
+                    label += f" — {src.country}"
+                with st.expander(label):
+                    if src.description:
+                        st.write(src.description[:300])
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":  # pragma: no cover
