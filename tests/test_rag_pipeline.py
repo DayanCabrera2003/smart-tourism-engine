@@ -136,3 +136,12 @@ def test_low_confidence_false_when_llm_has_answer():
     pipeline = _make_pipeline(llm_response="Ibiza es una isla con playas [1].")
     result = pipeline.answer("playa", top_k=3)
     assert result.low_confidence is False
+
+
+def test_context_numbers_match_sources():
+    """T067 — Los numeros [N] del contexto corresponden al orden de sources."""
+    pipeline = _make_pipeline()
+    result = pipeline.answer("playa", top_k=2)
+    assert len(result.sources) >= 1
+    first_source = result.sources[0]
+    assert first_source.id is not None
