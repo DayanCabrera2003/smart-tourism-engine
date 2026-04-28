@@ -13,8 +13,17 @@ class Settings(BaseSettings):
     # URL de la base de datos vectorial Qdrant
     QDRANT_URL: str = "http://localhost:6333"
 
-    # API Key para el LLM 
+    # API Key para el LLM
     LLM_API_KEY: Optional[str] = None
+
+    # Proveedor del LLM: "gemini" o "ollama"
+    LLM_PROVIDER: str = "gemini"
+
+    # URL base de Ollama (solo si LLM_PROVIDER=ollama)
+    OLLAMA_URL: str = "http://localhost:11434"
+
+    # Modelo de Ollama
+    OLLAMA_MODEL: str = "llama3"
 
     # API Key para OpenTripMap
     OPENTRIPMAP_API_KEY: Optional[str] = None

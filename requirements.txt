@@ -8,6 +8,7 @@ httpx
 streamlit
 qdrant-client
 sentence-transformers
+google-genai
 # Development dependencies
 pytest
 pytest-cov
