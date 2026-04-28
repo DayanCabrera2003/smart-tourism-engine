@@ -17,6 +17,18 @@ __all__ = ["RagPipeline"]
 
 _CACHE_MAX = 128
 
+_LOW_CONFIDENCE_PATTERNS = (
+    "no tengo suficiente",
+    "no dispongo",
+    "insufficient",
+    "no tengo información",
+)
+
+
+def _is_low_confidence(answer: str) -> bool:
+    lower = answer.lower()
+    return any(pat in lower for pat in _LOW_CONFIDENCE_PATTERNS)
+
 
 def _cache_key(query: str, top_k: int, mode: str, alpha: float) -> str:
     raw = f"{query.strip().lower()}|{top_k}|{mode}|{alpha:.2f}"
@@ -73,12 +85,13 @@ class RagPipeline:
             answer=answer_text,
             sources=sources,
             cached=False,
-            low_confidence=False,
+            low_confidence=_is_low_confidence(answer_text),
         )
-        if len(self._cache) >= _CACHE_MAX:
-            oldest = next(iter(self._cache))
-            del self._cache[oldest]
-        self._cache[key] = response
+        if not response.low_confidence:
+            if len(self._cache) >= _CACHE_MAX:
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
+            self._cache[key] = response
         return response
 
     def _clear_cache(self) -> None:
@@ -92,25 +105,24 @@ class RagPipeline:
         mode: str = "hybrid",
         alpha: float = 0.5,
     ) -> Generator[str, None, None]:
-        """Itera sobre tokens y emite el evento final JSON con fuentes.
-
-        VERSION PRELIMINAR: low_confidence siempre False, sin acumulacion de tokens.
-        Task 5 (T068) es una DEPENDENCIA HARD: actualiza este metodo con
-        acumulacion de tokens y deteccion real de low_confidence.
-        """
+        """Itera sobre tokens y emite el evento final JSON con fuentes."""
         hits = self._retrieve(query, top_k=top_k, mode=mode, alpha=alpha)
         sources = self._hits_to_results(hits)
         context = build_context(sources)
         prompt = build_prompt(query, context)
 
-        for token in self._llm.generate_stream(prompt):
-            yield token
-
         import json
 
+        collected: list[str] = []
+        for token in self._llm.generate_stream(prompt):
+            collected.append(token)
+            yield token
+
+        full_answer = "".join(collected)
+        low_conf = _is_low_confidence(full_answer)
         yield "[DONE]"
         yield json.dumps(
-            {"sources": [s.model_dump() for s in sources], "low_confidence": False}
+            {"sources": [s.model_dump() for s in sources], "low_confidence": low_conf}
         )
 
     def _retrieve(

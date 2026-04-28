@@ -122,3 +122,17 @@ def test_answer_cached_false_on_first_call():
     pipeline = _make_pipeline()
     result = pipeline.answer("playa", top_k=3)
     assert result.cached is False
+
+
+def test_low_confidence_when_llm_says_no_info():
+    pipeline = _make_pipeline(
+        llm_response="No tengo suficiente información para responder."
+    )
+    result = pipeline.answer("zzzzxxx", top_k=3)
+    assert result.low_confidence is True
+
+
+def test_low_confidence_false_when_llm_has_answer():
+    pipeline = _make_pipeline(llm_response="Ibiza es una isla con playas [1].")
+    result = pipeline.answer("playa", top_k=3)
+    assert result.low_confidence is False
