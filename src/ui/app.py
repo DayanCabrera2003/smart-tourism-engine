@@ -1,4 +1,4 @@
-"""T043/T044/T045/T047/T055/T066 — Streamlit UI para consultar los endpoints de búsqueda.
+"""T043/T044/T045/T047/T055/T066/T086 — Streamlit UI para consultar los endpoints de búsqueda.
 
 - T043: input de texto, botón de búsqueda y llamada HTTP a la API.
 - T044: cada resultado se renderiza como una tarjeta con nombre, país,
@@ -22,7 +22,7 @@ import os
 
 import httpx
 
-from src.api.schemas import AskResponse, DestinationResult, SearchResponse
+from src.api.schemas import AskResponse, DestinationResult, ImageSearchResponse, SearchResponse
 
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
@@ -154,6 +154,51 @@ def ask_question(
             http.close()
 
 
+def search_by_image_upload(
+    image_bytes: bytes,
+    *,
+    top_k: int = DEFAULT_TOP_K,
+    api_url: str = API_URL,
+    client: httpx.Client | None = None,
+) -> ImageSearchResponse:
+    """Envía una imagen al endpoint POST /search/by-image y devuelve los resultados."""
+    owns_client = client is None
+    http = client or httpx.Client(base_url=api_url, timeout=30.0)
+    try:
+        response = http.post(
+            "/search/by-image",
+            files={"file": ("image.jpg", image_bytes, "image/jpeg")},
+            params={"top_k": top_k},
+        )
+        response.raise_for_status()
+        return ImageSearchResponse.model_validate(response.json())
+    finally:
+        if owns_client:
+            http.close()
+
+
+def search_image_by_text_query(
+    query: str,
+    *,
+    top_k: int = DEFAULT_TOP_K,
+    api_url: str = API_URL,
+    client: httpx.Client | None = None,
+) -> ImageSearchResponse:
+    """Envía una consulta de texto al endpoint POST /search/image-by-text."""
+    owns_client = client is None
+    http = client or httpx.Client(base_url=api_url, timeout=30.0)
+    try:
+        response = http.post(
+            "/search/image-by-text",
+            json={"query": query, "top_k": top_k},
+        )
+        response.raise_for_status()
+        return ImageSearchResponse.model_validate(response.json())
+    finally:
+        if owns_client:
+            http.close()
+
+
 def stream_ask(
     query: str,
     *,
@@ -245,7 +290,7 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 ),
             )
 
-    tab_search, tab_ask = st.tabs(["Buscar destinos", "Preguntar"])
+    tab_search, tab_ask, tab_image = st.tabs(["Buscar destinos", "Preguntar", "Buscar por imagen"])
 
     with tab_search:
         query = st.text_input(
@@ -277,6 +322,9 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
     with tab_ask:
         api_mode = _SEARCH_MODE_TO_API.get(mode, "hybrid")
         _render_ask_tab(st, top_k=top_k, mode=api_mode, alpha=alpha)
+
+    with tab_image:
+        _render_image_tab(st, top_k=top_k)
 
 
 def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no cover - Streamlit
@@ -358,6 +406,86 @@ def _render_ask_tab(st, *, top_k: int, mode: str, alpha: float) -> None:  # prag
                         st.write(src.description[:300])
     except Exception:
         pass
+
+
+def _render_image_tab(st, *, top_k: int) -> None:  # pragma: no cover
+    """Renderiza el tab de búsqueda multimodal (T086).
+
+    Ofrece dos modos:
+    - Subir imagen: envía la imagen a /search/by-image.
+    - Consulta de texto: envía la query a /search/image-by-text.
+    Los resultados muestran destination_id y ruta de imagen con su score CLIP.
+    """
+    st.subheader("Buscar por imagen")
+    st.caption("Busca destinos visualmente similares o describe lo que buscas con texto.")
+
+    mode_image = st.radio(
+        "Modo de entrada",
+        options=["Subir imagen", "Descripcion de texto"],
+        horizontal=True,
+        key="image_tab_mode",
+    )
+
+    if mode_image == "Subir imagen":
+        uploaded = st.file_uploader(
+            "Sube una imagen (JPEG o PNG)",
+            type=["jpg", "jpeg", "png"],
+            key="image_uploader",
+        )
+        search_clicked = st.button("Buscar similares", type="primary", key="img_search_btn")
+
+        if search_clicked:
+            if uploaded is None:
+                st.warning("Sube una imagen primero.")
+            else:
+                st.image(uploaded, caption="Imagen subida", use_container_width=True)
+                try:
+                    resp = search_by_image_upload(uploaded.read(), top_k=top_k)
+                except httpx.HTTPError as exc:
+                    st.error(f"Error al consultar la API ({API_URL}): {exc}")
+                    return
+                if not resp.results:
+                    st.info("Sin resultados. Asegúrate de que las imágenes están indexadas.")
+                else:
+                    st.subheader(f"{len(resp.results)} imagen(es) similar(es)")
+                    _render_image_results(st, resp)
+
+    else:
+        query = st.text_input(
+            "Descripcion visual",
+            placeholder="playa tropical con palmeras",
+            key="img_text_query",
+        )
+        search_clicked = st.button("Buscar imágenes", type="primary", key="img_text_btn")
+
+        if search_clicked:
+            if not query.strip():
+                st.warning("Escribe una descripción antes de buscar.")
+            else:
+                try:
+                    resp = search_image_by_text_query(query, top_k=top_k)
+                except httpx.HTTPError as exc:
+                    st.error(f"Error al consultar la API ({API_URL}): {exc}")
+                    return
+                if not resp.results:
+                    st.info("Sin resultados. Asegúrate de que las imágenes están indexadas.")
+                else:
+                    st.subheader(f"{len(resp.results)} imagen(es) encontrada(s)")
+                    _render_image_results(st, resp)
+
+
+def _render_image_results(st, resp: ImageSearchResponse) -> None:  # pragma: no cover
+    """Renderiza los resultados de búsqueda multimodal (T086)."""
+    for hit in resp.results:
+        with st.container(border=True):
+            col_info, col_score = st.columns([5, 1])
+            col_info.markdown(f"**{hit.destination_id}**")
+            col_score.metric("score", f"{hit.score:.3f}")
+            if hit.image_path:
+                try:
+                    st.image(hit.image_path, use_container_width=True)
+                except Exception:
+                    st.caption(f"`{hit.image_path}`")
 
 
 if __name__ == "__main__":  # pragma: no cover
