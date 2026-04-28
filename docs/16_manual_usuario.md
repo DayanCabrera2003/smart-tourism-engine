@@ -51,3 +51,16 @@ o para un grupo específico:
 ```bash
 python -m src.cli ingest --help
 ```
+
+## Modo Preguntar (RAG)
+
+El tab "Preguntar" permite formular preguntas en lenguaje natural.
+
+1. Haz clic en el tab **"Preguntar"**.
+2. Escribe tu pregunta: *"¿Qué destinos de playa en España son buenos para familias?"*
+3. Pulsa **"Preguntar"**.
+4. La respuesta aparece en tiempo real (streaming).
+5. Las **fuentes** `[1]`, `[2]`... corresponden a los destinos expandibles al final.
+
+Si aparece el aviso "Informacion insuficiente", el corpus no tiene datos para
+esa pregunta. Intenta una búsqueda más general en el tab "Buscar destinos".

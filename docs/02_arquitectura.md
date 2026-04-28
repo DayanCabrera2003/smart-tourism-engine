@@ -65,6 +65,8 @@ La aplicación FastAPI vive en `src/api/main.py` y se arranca con `uvicorn src.a
 |--------|-----------|-----------------------------------------------------------------------------|---------------------------|
 | GET    | `/health` | Sonda de disponibilidad del servicio (liveness probe).                      | `{"status": "ok"}` (200)  |
 | POST   | `/search` | Recupera destinos aplicando el Booleano Extendido (p-norm) sobre el índice. | `SearchResponse` (200)    |
+| POST   | `/ask`    | Pregunta en lenguaje natural → respuesta RAG completa (T065).               | `AskResponse` (200)       |
+| POST   | `/ask/stream` | Igual que `/ask` pero en streaming SSE (T069).                          | `text/event-stream` (200) |
 
 ### `POST /search` (T040)
 

@@ -121,3 +121,17 @@ graph TD
 Se han configurado los siguientes volúmenes para asegurar que la información no se pierda al reiniciar contenedores:
 - `./data/qdrant_storage`: Persistencia de los vectores en Qdrant.
 - `./data`: Persistencia del catálogo SQLite y archivos procesados en el contenedor de la aplicación.
+
+## Despliegue offline (Ollama) — T072
+
+Para usar el sistema sin conexión a internet, configura Ollama como proveedor LLM:
+
+1. Instala Ollama: https://ollama.com/download
+2. Descarga el modelo: `ollama pull llama3`
+3. En `.env`, cambia:
+   ```
+   LLM_PROVIDER=ollama
+   OLLAMA_URL=http://localhost:11434
+   OLLAMA_MODEL=llama3
+   ```
+4. Levanta el sistema: `docker compose up`
