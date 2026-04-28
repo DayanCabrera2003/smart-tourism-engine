@@ -13,6 +13,8 @@ T047 — Acepta ``p`` en el body y construye el recuperador p-norm por
        petición, permitiendo a la UI exponer el parámetro en un slider.
 T053 — Expone ``POST /search/semantic`` que embebe la consulta y consulta
        la colección ``destinations_text`` de Qdrant directamente.
+T055 — Expone ``POST /search/hybrid`` que combina Booleano Extendido y
+       semántico con peso ``alpha`` configurable.
 """
 from __future__ import annotations
 
@@ -29,6 +31,7 @@ from sqlalchemy import select
 from src.api import middleware
 from src.api.schemas import (
     DestinationResult,
+    HybridSearchRequest,
     SearchRequest,
     SearchResponse,
     SemanticSearchRequest,
@@ -39,6 +42,7 @@ from src.indexing.embedder import TextEmbedder
 from src.indexing.inverted_index import InvertedIndex
 from src.indexing.vector_store import VectorStore
 from src.retrieval.extended_boolean import ExtendedBoolean
+from src.retrieval.hybrid import HybridRetriever
 
 app = FastAPI(
     title="Smart Tourism Engine API",
@@ -211,6 +215,42 @@ def search_semantic(
                 country=payload.get("country") or meta.get("country"),
                 description=meta.get("description"),
                 image_urls=list(payload.get("image_urls") or meta.get("image_urls") or []),
+            )
+        )
+    return SearchResponse(results=results)
+
+
+@app.post("/search/hybrid", response_model=SearchResponse)
+def search_hybrid(
+    request: HybridSearchRequest,
+    index: IndexDep,
+    store: VectorStoreDep,
+    embedder: EmbedderDep,
+    collection: SemanticCollectionDep,
+    retriever_factory: RetrieverFactoryDep,
+    destinations: DestinationsDep,
+) -> SearchResponse:
+    """Búsqueda híbrida (T055): Booleano Extendido + semántico con peso alpha."""
+    extended = retriever_factory(request.p)
+    hybrid = HybridRetriever(
+        extended=extended,
+        embedder=embedder,
+        store=store,
+        collection=collection,
+        alpha=request.alpha,
+    )
+    hits = hybrid.search(request.query, index, top_k=request.top_k)
+    results: list[DestinationResult] = []
+    for doc_id, score in hits:
+        meta = destinations.get(doc_id) or {}
+        results.append(
+            DestinationResult(
+                id=doc_id,
+                score=score,
+                name=meta.get("name"),
+                country=meta.get("country"),
+                description=meta.get("description"),
+                image_urls=list(meta.get("image_urls") or []),
             )
         )
     return SearchResponse(results=results)

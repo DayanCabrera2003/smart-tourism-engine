@@ -1,8 +1,9 @@
-"""Schemas Pydantic de request/response de la API (T041).
+"""Schemas Pydantic de request/response de la API (T041, T055).
 
-Centraliza los modelos que consume ``src/api/main.py`` para el endpoint
-``POST /search``.  Mantenerlos aislados facilita su reutilización desde la UI
-y los tests, y evita mezclar definiciones de datos con el wiring de FastAPI.
+Centraliza los modelos que consume ``src/api/main.py`` para los endpoints
+``POST /search``, ``POST /search/semantic`` y ``POST /search/hybrid``.
+Mantenerlos aislados facilita su reutilización desde la UI y los tests, y
+evita mezclar definiciones de datos con el wiring de FastAPI.
 """
 from __future__ import annotations
 
@@ -77,6 +78,37 @@ class DestinationResult(BaseModel):
             "URLs de imágenes del destino (T045). La UI muestra la primera; "
             "lista vacía indica que no hay imágenes disponibles."
         ),
+    )
+
+
+class HybridSearchRequest(BaseModel):
+    """Cuerpo del ``POST /search/hybrid`` (T055)."""
+
+    query: str = Field(
+        ...,
+        min_length=1,
+        description="Consulta; la rama léxica parsea AND/OR, la semántica la embebe.",
+    )
+    top_k: int = Field(
+        10,
+        ge=1,
+        le=100,
+        description="Número máximo de resultados a devolver.",
+    )
+    alpha: float = Field(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Peso de la rama léxica en [0, 1]. "
+            "alpha=1.0 → solo Booleano Extendido; alpha=0.0 → solo semántico."
+        ),
+    )
+    p: float = Field(
+        2.0,
+        ge=1.0,
+        le=10.0,
+        description="Norma-p de la rama Booleana Extendida.",
     )
 
 
