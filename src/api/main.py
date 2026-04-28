@@ -41,6 +41,9 @@ from src.api.schemas import (
     AskResponse,
     DestinationResult,
     HybridSearchRequest,
+    ImageByTextRequest,
+    ImageSearchResponse,
+    ImageSearchResult,
     SearchRequest,
     SearchResponse,
     SemanticSearchRequest,
@@ -185,6 +188,25 @@ def get_semantic_collection() -> str:
     return DEFAULT_COLLECTION
 
 
+@lru_cache(maxsize=1)
+def _default_clip_embedder():
+    from src.multimodal.clip_embedder import ClipEmbedder
+
+    return ClipEmbedder()
+
+
+def get_clip_embedder():
+    """Provee el embedder CLIP (T084/T085).  Inyectable en tests."""
+    return _default_clip_embedder()
+
+
+def get_image_collection() -> str:
+    """Nombre de la colección Qdrant de imágenes CLIP (T084)."""
+    from src.multimodal.image_indexer import IMAGE_COLLECTION
+
+    return IMAGE_COLLECTION
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -299,6 +321,42 @@ def search_hybrid(
             )
         )
     return SearchResponse(results=results)
+
+
+ClipEmbedderDep = Annotated[object, Depends(get_clip_embedder)]
+ImageCollectionDep = Annotated[str, Depends(get_image_collection)]
+
+
+@app.post("/search/image-by-text", response_model=ImageSearchResponse)
+def search_image_by_text(
+    request: ImageByTextRequest,
+    clip: ClipEmbedderDep,
+    store: VectorStoreDep,
+    collection: ImageCollectionDep,
+) -> ImageSearchResponse:
+    """Búsqueda texto → imagen con CLIP (T084).
+
+    Embebe la query con CLIP y recupera las imágenes más similares
+    de la colección ``destinations_image``.
+    """
+    try:
+        query_vector = clip.embed_text(request.query)
+        hits = store.search(collection, query_vector, top_k=request.top_k)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Búsqueda imagen-por-texto no disponible: {exc}",
+        ) from exc
+
+    results = [
+        ImageSearchResult(
+            destination_id=str(payload.get("destination_id") or point_id),
+            image_path=str(payload.get("image_path", "")),
+            score=max(0.0, min(1.0, float(score))),
+        )
+        for point_id, score, payload in hits
+    ]
+    return ImageSearchResponse(results=results)
 
 
 RagPipelineDep = Annotated["RagPipeline", Depends(get_rag_pipeline)]

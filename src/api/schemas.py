@@ -140,6 +140,51 @@ class AskResponse(BaseModel):
     )
 
 
+class ImageSearchResult(BaseModel):
+    """Resultado de búsqueda multimodal por imagen (T084/T085)."""
+
+    destination_id: str = Field(..., description="ID del destino al que pertenece la imagen.")
+    image_path: str = Field(..., description="Ruta de la imagen indexada en Qdrant.")
+    score: float = Field(..., ge=0.0, le=1.0, description="Similitud coseno CLIP.")
+
+
+class ImageSearchResponse(BaseModel):
+    """Respuesta de los endpoints de búsqueda multimodal."""
+
+    results: list[ImageSearchResult] = Field(default_factory=list)
+
+
+class ImageByTextRequest(BaseModel):
+    """Cuerpo de ``POST /search/image-by-text`` (T084)."""
+
+    query: str = Field(..., min_length=1, description="Consulta de texto; se embebe con CLIP.")
+    top_k: int = Field(10, ge=1, le=100, description="Número máximo de imágenes a devolver.")
+
+
+class MultimodalSearchRequest(BaseModel):
+    """Cuerpo de ``POST /search/multimodal`` (T088).
+
+    Combina una consulta de texto obligatoria con una imagen opcional
+    (codificada en base64) para una búsqueda en el espacio CLIP.
+    """
+
+    query: str = Field(..., min_length=1, description="Consulta de texto.")
+    image_b64: str | None = Field(
+        None,
+        description=(
+            "Imagen codificada en base64 (JPEG/PNG). Si se proporciona, "
+            "se combina el embedding de texto y el de imagen con ``alpha``."
+        ),
+    )
+    top_k: int = Field(10, ge=1, le=100, description="Número máximo de resultados.")
+    alpha: float = Field(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description="Peso del texto en [0,1]. 1.0 = solo texto, 0.0 = solo imagen.",
+    )
+
+
 class AskRequest(BaseModel):
     """Cuerpo del ``POST /ask`` y ``POST /ask/stream``."""
 
