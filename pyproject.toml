@@ -19,6 +19,8 @@ dependencies = [
     "nltk",
     "streamlit",
     "google-genai",
+    "python-multipart",
+    "pillow",
 ]
 
 [project.optional-dependencies]

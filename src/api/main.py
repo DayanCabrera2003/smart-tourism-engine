@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Annotated
 if TYPE_CHECKING:
     from src.rag.pipeline import RagPipeline
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
@@ -347,6 +347,58 @@ def search_image_by_text(
             status_code=503,
             detail=f"Búsqueda imagen-por-texto no disponible: {exc}",
         ) from exc
+
+    results = [
+        ImageSearchResult(
+            destination_id=str(payload.get("destination_id") or point_id),
+            image_path=str(payload.get("image_path", "")),
+            score=max(0.0, min(1.0, float(score))),
+        )
+        for point_id, score, payload in hits
+    ]
+    return ImageSearchResponse(results=results)
+
+
+@app.post("/search/by-image", response_model=ImageSearchResponse)
+async def search_by_image(
+    clip: ClipEmbedderDep,
+    store: VectorStoreDep,
+    collection: ImageCollectionDep,
+    file: Annotated[UploadFile, File(description="Imagen JPEG/PNG para buscar similares.")],
+    top_k: int = 10,
+) -> ImageSearchResponse:
+    """Búsqueda imagen → destinos similares con CLIP (T085).
+
+    Recibe una imagen subida, la embebe con CLIP y busca los destinos
+    visualmente más similares en la colección ``destinations_image``.
+    """
+    import io
+    import tempfile
+
+    from PIL import Image
+
+    data = await file.read()
+    try:
+        img = Image.open(io.BytesIO(data)).convert("RGB")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Imagen inválida: {exc}") from exc
+
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        img.save(tmp.name, format="JPEG")
+        tmp_path = tmp.name
+
+    try:
+        query_vector = clip.embed_image(tmp_path)
+        hits = store.search(collection, query_vector, top_k=top_k)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Búsqueda por imagen no disponible: {exc}",
+        ) from exc
+    finally:
+        import os
+
+        os.unlink(tmp_path)
 
     results = [
         ImageSearchResult(
