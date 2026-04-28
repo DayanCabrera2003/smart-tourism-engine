@@ -28,6 +28,15 @@ class Settings(BaseSettings):
     # API Key para OpenTripMap
     OPENTRIPMAP_API_KEY: Optional[str] = None
 
+    # API Key para Tavily (busqueda web fallback, T073)
+    TAVILY_API_KEY: Optional[str] = None
+
+    # Umbral de score por debajo del cual se activa el fallback web (T074)
+    TAVILY_FALLBACK_SCORE_THRESHOLD: float = 0.30
+
+    # Maximo de llamadas a Tavily por minuto (T079)
+    TAVILY_RATE_LIMIT_PER_MINUTE: int = 20
+
     # Nivel de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     LOG_LEVEL: str = "INFO"
 

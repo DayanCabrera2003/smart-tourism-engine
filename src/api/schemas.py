@@ -79,6 +79,10 @@ class DestinationResult(BaseModel):
             "lista vacía indica que no hay imágenes disponibles."
         ),
     )
+    from_web: bool = Field(
+        False,
+        description="True si el resultado proviene de la busqueda web (Tavily, T078).",
+    )
 
 
 class HybridSearchRequest(BaseModel):
