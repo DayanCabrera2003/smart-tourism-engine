@@ -140,6 +140,45 @@ tests con un `VectorStore` en memoria, de modo que
 creación, la idempotencia y el borrado con `--recreate` sin depender de un
 servicio Qdrant externo.
 
+## Caché de embeddings en disco (T056)
+
+El módulo [`src/indexing/embedding_cache.py`](../src/indexing/embedding_cache.py)
+implementa la clase `EmbeddingCache`, que actúa como decorador transparente
+sobre cualquier embedder:
+
+```python
+from src.indexing.embedding_cache import EmbeddingCache
+from src.indexing.embedder import TextEmbedder
+
+cache_path = "data/processed/embeddings_cache.pkl"
+cached_embedder = EmbeddingCache.load(TextEmbedder(), cache_path)
+
+vector = cached_embedder.embed("Playas del Caribe")   # genera y guarda
+vector = cached_embedder.embed("Playas del Caribe")   # hit — no llama al modelo
+cached_embedder.save()                                # persiste en disco
+```
+
+### Estrategia de caché
+
+La caché es un `dict[str, list[float]]` persistido con `pickle`. La clave
+es el **texto exacto** usado para generar el embedding. La decisión de usar
+pickle (en lugar de LMDB o SQLite) favorece la simplicidad: el corpus de
+destinos cabe completamente en RAM (~200 vectores × 384 floats × 4 bytes ≈
+300 KB), por lo que cargar el pickle completo al arranque es instantáneo.
+
+| Aspecto | Decisión |
+|---------|----------|
+| Formato | Pickle binario (`dict[str, list[float]]`) |
+| Clave | Texto completo (sensible a cambios menores) |
+| Persistencia | Explícita: llamar `save()` cuando corresponda |
+| Ubicación por defecto | `data/processed/embeddings_cache.pkl` |
+| Tolerancia a corrupción | Si el pickle no es un `dict`, la caché inicia vacía |
+
+La persistencia es **explícita** para que el llamador controle cuándo se
+escribe a disco. Esto evita I/O por cada petición en un servidor web y
+permite decidir, por ejemplo, persistir solo al terminar un lote de embeddings
+(como en el comando `embed`).
+
 ## Pipeline de embedding (T052)
 
 El módulo [`src/indexing/embed_destinations.py`](../src/indexing/embed_destinations.py)
