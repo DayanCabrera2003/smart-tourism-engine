@@ -179,6 +179,27 @@ escribe a disco. Esto evita I/O por cada petición en un servidor web y
 permite decidir, por ejemplo, persistir solo al terminar un lote de embeddings
 (como en el comando `embed`).
 
+## Reindexación incremental (T057)
+
+El comando CLI acepta la bandera `--only-new` para procesar solo los destinos
+que aún no tienen un embedding en Qdrant:
+
+```bash
+# Indexar únicamente los destinos nuevos (los ya presentes se omiten)
+python -m src.cli embed --only-new
+```
+
+Internamente, antes de iterar el JSONL, `embed_destinations` consulta los IDs
+existentes con `VectorStore.list_ids` (que usa la API `scroll` de Qdrant) y
+omite cualquier destino cuyo UUID5 ya esté en la colección.  Esto reduce el
+tiempo de re-ejecución y el número de llamadas al modelo de embeddings cuando
+el corpus crece de forma incremental.
+
+| Flag | Comportamiento |
+|------|----------------|
+| `--only-new` | Solo procesa destinos sin punto en Qdrant; devuelve el conteo de nuevos. |
+| (sin flag) | Procesa todos y sobreescribe puntos existentes (idempotente). |
+
 ## Pipeline de embedding (T052)
 
 El módulo [`src/indexing/embed_destinations.py`](../src/indexing/embed_destinations.py)

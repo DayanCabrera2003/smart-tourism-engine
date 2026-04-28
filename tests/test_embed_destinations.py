@@ -172,3 +172,66 @@ def test_slug_to_uuid_is_deterministic() -> None:
     assert slug_to_uuid("madrid-es") != slug_to_uuid("toledo-es")
 
 
+# ── T057 — only_new (reindexación incremental) ────────────────────────────────
+
+def test_only_new_skips_existing_documents(tmp_path: Path) -> None:
+    """Con only_new=True los documentos ya indexados no se vuelven a subir."""
+    docs = [
+        {"id": "d1", "name": "Playa", "description": "arena y mar"},
+        {"id": "d2", "name": "Montaña", "description": "nieve y picos"},
+    ]
+    path = tmp_path / "dest.jsonl"
+    _write_jsonl(path, docs)
+
+    store = _fresh_store()
+    embedder = _StubEmbedder()
+
+    embed_destinations(path, store, embedder)
+    calls_first = len(embedder.calls)
+
+    embedder2 = _StubEmbedder()
+    result = embed_destinations(path, store, embedder2, only_new=True)
+    assert result == 0
+    assert len(embedder2.calls) == 0, "No se debe llamar al embedder para puntos ya existentes"
+
+    _ = calls_first  # just used for reference
+
+
+def test_only_new_indexes_new_documents(tmp_path: Path) -> None:
+    """Con only_new=True se indexan los documentos aún no presentes en Qdrant."""
+    first = [{"id": "d1", "name": "Playa", "description": "arena"}]
+    second = [
+        {"id": "d1", "name": "Playa", "description": "arena"},
+        {"id": "d2", "name": "Montaña", "description": "nieve"},
+    ]
+    path = tmp_path / "dest.jsonl"
+    _write_jsonl(path, first)
+
+    store = _fresh_store()
+    embed_destinations(path, store, _StubEmbedder())
+
+    _write_jsonl(path, second)
+    embedder2 = _StubEmbedder()
+    result = embed_destinations(path, store, embedder2, only_new=True)
+    assert result == 1
+    assert len(embedder2.calls) == 1
+
+
+def test_only_new_false_reindexes_all(tmp_path: Path) -> None:
+    """Sin only_new los puntos existentes se sobreescriben (idempotente)."""
+    docs = [{"id": "d1", "name": "Ciudad", "description": "museo"}]
+    path = tmp_path / "dest.jsonl"
+    _write_jsonl(path, docs)
+
+    store = _fresh_store()
+    embed_destinations(path, store, _StubEmbedder())
+    result = embed_destinations(path, store, _StubEmbedder(), only_new=False)
+    assert result == 1
+
+
+def test_list_ids_returns_empty_for_missing_collection() -> None:
+    """list_ids devuelve set vacío si la colección no existe."""
+    store = VectorStore(url=":memory:")
+    assert store.list_ids("nonexistent_collection") == set()
+
+

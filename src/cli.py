@@ -45,8 +45,13 @@ def embed_cmd(
     collection: str = typer.Option(
         None, "--collection", help="Nombre de la colección Qdrant (default: destinations_text)."
     ),
+    only_new: bool = typer.Option(
+        False,
+        "--only-new",
+        help="Solo indexa destinos que aún no tienen embedding en Qdrant (T057).",
+    ),
 ):
-    """Genera embeddings de los destinos y los sube a Qdrant (T052)."""
+    """Genera embeddings de los destinos y los sube a Qdrant (T052/T057)."""
     from src.indexing.embed_destinations import DEFAULT_COLLECTION, embed_destinations
     from src.indexing.embedder import TextEmbedder
     from src.indexing.vector_store import VectorStore
@@ -65,8 +70,10 @@ def embed_cmd(
             TextEmbedder(),
             collection=coll,
             batch_size=batch_size,
+            only_new=only_new,
         )
-        typer.echo(f"Embeddings subidos a '{coll}': {total} puntos.")
+        mode = "nuevos" if only_new else "total"
+        typer.echo(f"Embeddings subidos a '{coll}': {total} puntos ({mode}).")
     except FileNotFoundError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc

@@ -1,4 +1,4 @@
-"""T052 — Genera embeddings de destinos y los sube a Qdrant en batches."""
+"""T052/T057 — Genera embeddings de destinos y los sube a Qdrant en batches."""
 from __future__ import annotations
 
 import json
@@ -41,6 +41,7 @@ def embed_destinations(
     *,
     collection: str = DEFAULT_COLLECTION,
     batch_size: int = 64,
+    only_new: bool = False,
 ) -> int:
     """
     Lee destinos desde ``source`` (JSONL), genera el embedding de cada uno
@@ -51,7 +52,11 @@ def embed_destinations(
     derivado del ``id`` del destino; el slug original se preserva en el
     payload para que el recuperador pueda devolverlo a la UI.
 
-    Devuelve el número total de puntos enviados.
+    Si ``only_new=True``, consulta los IDs existentes en Qdrant y omite los
+    destinos que ya tienen un punto en la colección (reindexación incremental,
+    T057).
+
+    Devuelve el número total de puntos enviados (los ya existentes no se cuentan).
     """
     source = Path(source)
     if not source.exists():
@@ -59,6 +64,13 @@ def embed_destinations(
 
     if batch_size <= 0:
         raise ValueError("batch_size debe ser > 0")
+
+    existing_ids: set[str] = set()
+    if only_new:
+        existing_ids = store.list_ids(collection)
+        logger.info(
+            "Modo incremental: %d IDs ya presentes en '%s'", len(existing_ids), collection
+        )
 
     total = 0
     batch: list[VectorPoint] = []
@@ -69,6 +81,9 @@ def embed_destinations(
             if not line:
                 continue
             doc = json.loads(line)
+            point_id = slug_to_uuid(doc["id"])
+            if only_new and point_id in existing_ids:
+                continue
             text = f"{doc.get('name', '')}. {doc.get('description', '')}".strip()
             vector = embedder.embed(text)
             batch.append(_build_point(doc, vector))

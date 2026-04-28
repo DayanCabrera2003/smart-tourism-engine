@@ -79,6 +79,33 @@ class VectorStore:
         self._client.upsert(collection_name=collection, points=batch, wait=True)
         return len(batch)
 
+    def list_ids(self, collection: str) -> set[str]:
+        """Devuelve el conjunto de IDs (como strings) de todos los puntos de la colección.
+
+        Usa la API ``scroll`` de Qdrant para paginar sobre todos los puntos sin
+        cargar los vectores.  Útil para la reindexación incremental (T057).
+        """
+        if not self._client.collection_exists(collection):
+            return set()
+
+        ids: set[str] = set()
+        offset = None
+        while True:
+            results, next_offset = self._client.scroll(
+                collection_name=collection,
+                scroll_filter=None,
+                limit=256,
+                offset=offset,
+                with_payload=False,
+                with_vectors=False,
+            )
+            for point in results:
+                ids.add(str(point.id))
+            if next_offset is None:
+                break
+            offset = next_offset
+        return ids
+
     def search(
         self,
         collection: str,
