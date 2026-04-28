@@ -44,6 +44,7 @@ from src.api.schemas import (
     ImageByTextRequest,
     ImageSearchResponse,
     ImageSearchResult,
+    MultimodalSearchRequest,
     SearchRequest,
     SearchResponse,
     SemanticSearchRequest,
@@ -399,6 +400,67 @@ async def search_by_image(
         import os
 
         os.unlink(tmp_path)
+
+    results = [
+        ImageSearchResult(
+            destination_id=str(payload.get("destination_id") or point_id),
+            image_path=str(payload.get("image_path", "")),
+            score=max(0.0, min(1.0, float(score))),
+        )
+        for point_id, score, payload in hits
+    ]
+    return ImageSearchResponse(results=results)
+
+
+@app.post("/search/multimodal", response_model=ImageSearchResponse)
+def search_multimodal(
+    request: MultimodalSearchRequest,
+    clip: ClipEmbedderDep,
+    store: VectorStoreDep,
+    collection: ImageCollectionDep,
+) -> ImageSearchResponse:
+    """Búsqueda multimodal combinada: texto + imagen opcional (T088).
+
+    Si se proporciona ``image_b64``, combina el embedding de texto y el de
+    imagen con peso ``alpha`` antes de consultar Qdrant.
+    Si no hay imagen, usa solo el embedding de texto (equivalente a T084).
+    """
+    import base64
+    import io
+    import tempfile
+
+    from PIL import Image
+
+    try:
+        text_vector = clip.embed_text(request.query)
+
+        if request.image_b64:
+            img_bytes = base64.b64decode(request.image_b64)
+            img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                img.save(tmp.name, format="JPEG")
+                tmp_path = tmp.name
+            try:
+                image_vector = clip.embed_image(tmp_path)
+            finally:
+                import os
+
+                os.unlink(tmp_path)
+
+            from src.multimodal.fusion import combine_vectors
+
+            query_vector = combine_vectors(text_vector, image_vector, request.alpha)
+        else:
+            query_vector = text_vector
+
+        hits = store.search(collection, query_vector, top_k=request.top_k)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Búsqueda multimodal no disponible: {exc}",
+        ) from exc
 
     results = [
         ImageSearchResult(
