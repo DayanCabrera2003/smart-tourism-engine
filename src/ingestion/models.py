@@ -29,6 +29,15 @@ class Destination(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
         description="Fecha de adquisición",
     )
+    popularity: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Score de popularidad en [0, 1] (T099). Se calcula a partir de la "
+            "longitud de la descripción y las menciones cruzadas en el corpus."
+        ),
+    )
 
     model_config = {
         "json_schema_extra": {

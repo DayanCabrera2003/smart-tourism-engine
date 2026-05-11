@@ -5,7 +5,17 @@ Incluye función upsert_destination().
 import json
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, MetaData, String, Table, create_engine
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Float,
+    MetaData,
+    String,
+    Table,
+    create_engine,
+    inspect,
+    text,
+)
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
@@ -35,9 +45,30 @@ destinations = Table(
     Column("lon", Float),
     Column("source", String, nullable=False),
     Column("fetched_at", DateTime, nullable=False),
+    Column("popularity", Float),  # T099: nullable for legacy rows
 )
 
 metadata.create_all(engine)
+
+
+def _ensure_popularity_column() -> None:
+    """Idempotent migration: add popularity column to legacy databases (T099).
+
+    SQLAlchemy's ``create_all`` only creates missing tables, not missing
+    columns. Existing databases created before T099 still lack the
+    column, so we issue ``ALTER TABLE`` once at import time when needed.
+    """
+    inspector = inspect(engine)
+    columns = {col["name"] for col in inspector.get_columns("destinations")}
+    if "popularity" in columns:
+        return
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE destinations ADD COLUMN popularity FLOAT"))
+        conn.commit()
+
+
+_ensure_popularity_column()
+
 Session = sessionmaker(bind=engine, future=True)
 
 def upsert_destination(dest) -> None:
@@ -58,6 +89,7 @@ def upsert_destination(dest) -> None:
         "lon": dest.coordinates[1] if dest.coordinates else None,
         "source": dest.source,
         "fetched_at": dest.fetched_at if isinstance(dest.fetched_at, datetime) else datetime.now(),
+        "popularity": getattr(dest, "popularity", None),
     }
     stmt = sqlite_insert(destinations).values(**values)
     stmt = stmt.on_conflict_do_update(
