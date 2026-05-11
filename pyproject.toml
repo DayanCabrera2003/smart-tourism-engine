@@ -23,6 +23,7 @@ dependencies = [
     "google-genai",
     "python-multipart",
     "pillow",
+    "matplotlib",
 ]
 
 [project.optional-dependencies]

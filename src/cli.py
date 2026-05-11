@@ -150,6 +150,16 @@ def evaluate_cmd(
         "--modes",
         help="Lista separada por coma de modos a evaluar.",
     ),
+    plots_dir: str = typer.Option(
+        None,
+        "--plots-dir",
+        help="Directorio donde renderizar PNGs comparativos (default: docs/figures/).",
+    ),
+    no_plots: bool = typer.Option(
+        False,
+        "--no-plots",
+        help="Omitir la renderización de gráficas (útil en CI).",
+    ),
 ):
     """Evalúa los recuperadores contra queries.json y produce una tabla comparativa (T108)."""
     import json as _json
@@ -238,6 +248,15 @@ def evaluate_cmd(
         with out_file.open("w") as fh:
             _json.dump(report.to_json(), fh, ensure_ascii=False, indent=2)
         typer.echo(f"\nReporte completo guardado en {out_file}")
+
+    if not no_plots:
+        from src.evaluation.plots import render_plots
+
+        plots_target = _Path(plots_dir) if plots_dir else _Path("docs/figures")
+        paths = render_plots(report, plots_target)
+        typer.echo("Gráficas generadas:")
+        for path in paths:
+            typer.echo(f"  - {path}")
 
 
 @ingest_app.command("wikivoyage")

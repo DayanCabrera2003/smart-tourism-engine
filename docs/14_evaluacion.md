@@ -210,3 +210,31 @@ Sobre el corpus actual (206 destinos, índice TF-IDF):
 
 Los valores bajos en P@k vs R@k son esperables porque varias queries por país (`country=Spain` → 48 relevantes) tienen ground truth mucho mayor que el `top_k=10` del runner. El nDCG por encima del 0.28 confirma que cuando el booleano acierta, los aciertos aparecen razonablemente arriba (rangos cercanos a 1-3). Estos números se compararán contra los modos semántico/híbrido en cuanto Qdrant esté materializado.
 
+---
+
+## T109 — Gráficas de comparación
+
+`src/evaluation/plots.py` genera tres PNGs por ejecución del CLI:
+
+| Archivo | Tipo | Contenido |
+|---|---|---|
+| `docs/figures/metrics_by_mode.png` | Bar chart agrupado | Las seis métricas (P@k, R@k, F1@k, MAP, MRR, nDCG@k) en barras paralelas, una serie por modo. |
+| `docs/figures/heatmap_P_at_k.png` | Heatmap | Precision@k por (modo, query). Filas son modos, columnas son ids de queries. |
+| `docs/figures/heatmap_nDCG_at_k.png` | Heatmap | Mismo formato pero con nDCG@k. |
+
+### Cómo generar
+
+Los gráficos se renderizan automáticamente al final de `python -m src.cli evaluate`. Para omitirlos (por ejemplo en CI) pasa `--no-plots`. Para apuntar a otro directorio usa `--plots-dir docs/figures_v2`.
+
+```bash
+python -m src.cli evaluate --modes boolean --plots-dir docs/figures
+```
+
+### Decisiones de diseño
+
+- **Solo modos disponibles**: el bar chart y los heatmaps ignoran los modos con `available=False` (Qdrant down, embedder no descargable, etc.) para no producir filas vacías que confunden al lector.
+- **Backend `Agg`**: matplotlib se inicializa con backend no interactivo. Permite correr el comando en CI o vía SSH sin display.
+- **Eje Y fijo en `[0, 1]`**: las seis métricas están en ese rango por construcción; fijarlo evita que matplotlib auto-escale y dé impresión de mejoras grandes que en realidad son pequeñas.
+- **DPI 150**: resolución suficiente para impresión LNCS (las figuras del informe se exportan a PDF en T114). Tamaño total por figura: ~30 KB.
+
+
