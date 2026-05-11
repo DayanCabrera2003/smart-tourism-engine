@@ -120,4 +120,46 @@ Se calcula como coseno entre el embedding del perfil del usuario (T091) y el emb
 - **Función pura sobre hits ya recuperados**: no toca Qdrant ni LLM. Su input son tuplas `(id, relevance)` y diccionarios laterales. Es trivial de testear y barato de ejecutar por request.
 - **Señales ausentes valen 0**: si un destino no tiene popularidad calculada o no está embebido, su componente correspondiente cuenta como cero en lugar de explotar. Esto permite degradar elegante con corpus parciales.
 
+---
+
+## T102 — Diversificación con MMR
+
+`src/retrieval/diversify.py` implementa Maximal Marginal Relevance (Carbonell & Goldstein, 1998) para evitar que el top-k contenga diez resultados visualmente iguales (diez playas del Caribe, diez capitales europeas).
+
+### Algoritmo (greedy)
+
+Sea $S$ el conjunto seleccionado en cada iteración. Para cada candidato $d$ del pool restante:
+
+$$
+\mathrm{MMR}(d) = \lambda \cdot \mathrm{relevance}(d) - (1 - \lambda) \cdot \max_{d' \in S} \cos(\mathrm{emb}(d), \mathrm{emb}(d'))
+$$
+
+El siguiente seleccionado es $\arg\max_d \mathrm{MMR}(d)$. La primera elección no tiene $S$ aún, así que es pura relevancia (la "semilla").
+
+Iteración hasta llenar `top_k` o vaciar el pool.
+
+### Hiperparámetro lambda
+
+| `lambda_` | Comportamiento |
+|---|---|
+| `1.0` | Sin diversificación — el ranking original sale intacto. |
+| `0.7` (default) | Relevancia domina pero los duplicados visibles se reorganizan hacia abajo. |
+| `0.5` | Equilibrio: la mitad del peso es relevancia, la otra mitad diversidad. |
+| `0.0` | Maximum diversity. Útil para una sección "Visualmente similares" intencionalmente variada. |
+
+### Manejo de destinos sin embedding
+
+MMR no puede operar sobre destinos no embebidos (no hay vector para medir similitud). En vez de descartarlos, los **apila al final del resultado** preservando su orden relativo. Esto:
+
+- Cubre el caso de un corpus parcialmente embebido (cuando el último batch de ingesta aún no llegó a Qdrant).
+- Garantiza que el `top_k` solicitado se puede satisfacer aunque solo una fracción esté embebida.
+
+### Decisiones de diseño
+
+- **Greedy en lugar de óptimo global**: la formulación óptima es NP-hard; el greedy es el estándar de facto en IR y produce resultados indistinguibles en la práctica para `top_k` típicos (5-20).
+- **Conserva los scores originales**: MMR no rescribe relevancia, solo decide el orden. Si la UI quiere mostrar el score, ve el mismo número que el recuperador devolvió.
+- **Coseno reutilizado**: usa `cosine_similarity` de `src/retrieval/reranker.py` para no duplicar implementaciones del producto interno.
+- **MMR no es siempre la mejor opción**: para queries muy específicas ("museos en Madrid"), forzar diversidad puede empujar resultados peores arriba. El módulo es una herramienta, no se aplica por defecto en todas las búsquedas; la UI decide cuándo activarlo (T103).
+
+
 
