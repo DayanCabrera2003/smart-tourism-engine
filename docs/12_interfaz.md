@@ -295,3 +295,21 @@ Antes de mostrar las pestañas principales, la app pide al usuario que elija un 
 - **Persistencia en `st.session_state`**: el proyecto no tiene usuarios persistidos; la sesión del navegador es el contenedor natural. Si en el futuro se añade login, el helper sólo cambia de fuente sin tocar el resto de la UI.
 - **Almacenamos el id sin prefijo**: facilita la lectura en el sidebar; el prefijo `synthetic:` se reañade al armar `user_id` para `/recommend`.
 - **Botón "Cambiar perfil"**: el onboarding no es irreversible; explorar varias personas en la misma sesión cuesta dos clicks.
+
+## T098 — Pestaña "Recomendado para ti"
+
+`_render_recommend_tab` añade la cuarta pestaña al layout principal (junto a Buscar, Preguntar y Buscar por imagen).
+
+### Comportamiento
+
+1. Lee el perfil con `selected_profile_user_id`. Si no hay perfil, muestra un mensaje pidiendo configurar el onboarding y termina.
+2. Permite ajustar `top_k` con un slider (1-20, default 6).
+3. Al pulsar "Cargar recomendaciones" llama a `fetch_recommendations`, que envía `POST /recommend` con `user_id`, `top_k`, `mode="hybrid"` y `alpha=0.6`.
+4. Renderiza la persona usada como ancla (`response.persona`) y las tarjetas de los destinos con el mismo helper `_render_card` que el tab de búsqueda.
+5. Si `response.empty=True` muestra "No hay recomendaciones disponibles todavía".
+
+### Decisiones de diseño
+
+- **Reuso de `_render_card`**: las tarjetas de Recomendado para ti respetan el mismo layout que las de Buscar, evitando una UI inconsistente.
+- **Modo `hybrid` fijo**: ofrecer al usuario elegir entre content/collaborative/hybrid agregaría fricción sin valor claro; el híbrido cubre los dos extremos.
+- **Carga bajo demanda**: no se llama al endpoint en cada `rerun`; solo cuando el usuario lo solicita. Mantiene la pestaña barata si el usuario solo viene a buscar.

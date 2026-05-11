@@ -1,4 +1,4 @@
-"""T043/T044/T045/T047/T055/T066/T086/T097 — Streamlit UI para consultar los endpoints de búsqueda.
+"""T043-T098 — Streamlit UI para consultar los endpoints de búsqueda y recomendación.
 
 - T043: input de texto, botón de búsqueda y llamada HTTP a la API.
 - T044: cada resultado se renderiza como una tarjeta con nombre, país,
@@ -13,7 +13,9 @@
 - T066: añade el tab "Preguntar" con helpers ``ask_question`` y ``stream_ask``
   que consumen ``POST /ask`` y ``POST /ask/stream`` respectivamente.
 - T097: onboarding de perfil sintético; selección persistida en
-  ``st.session_state`` y disponible para la pestaña de recomendaciones.
+  ``st.session_state``.
+- T098: pestaña "Recomendado para ti" que consume ``POST /recommend`` y
+  renderiza los destinos sugeridos para el perfil activo.
 
 La lógica de llamada HTTP y los helpers viven como funciones puras para poder
 testearlos sin necesidad de levantar el runtime de Streamlit.
@@ -28,6 +30,7 @@ from src.api.schemas import (
     AskResponse,
     DestinationResult,
     ImageSearchResponse,
+    RecommendResponse,
     SearchResponse,
 )
 from src.recommendation.synthetic_profiles import (
@@ -66,6 +69,9 @@ PROFILE_LABELS: dict[str, str] = {
     "cultural": "Cultural",
     "lujo": "Lujo",
 }
+RECOMMEND_TOP_K_DEFAULT = 6
+RECOMMEND_MODE_DEFAULT = "hybrid"
+RECOMMEND_ALPHA_DEFAULT = 0.6
 
 
 def synthetic_profile_label(profile_id: str) -> str:
@@ -100,6 +106,37 @@ def selected_profile_user_id(session_state: dict) -> str | None:
     if not raw:
         return None
     return f"synthetic:{raw}"
+
+
+def fetch_recommendations(
+    user_id: str | None,
+    *,
+    interests: list[str] | None = None,
+    history: list[str] | None = None,
+    top_k: int = RECOMMEND_TOP_K_DEFAULT,
+    mode: str = RECOMMEND_MODE_DEFAULT,
+    alpha: float = RECOMMEND_ALPHA_DEFAULT,
+    api_url: str = API_URL,
+    client: httpx.Client | None = None,
+) -> RecommendResponse:
+    """Call ``POST /recommend`` and return the parsed response (T098)."""
+    payload: dict = {
+        "user_id": user_id,
+        "interests": list(interests or []),
+        "history": list(history or []),
+        "top_k": top_k,
+        "mode": mode,
+        "alpha": alpha,
+    }
+    owns_client = client is None
+    http = client or httpx.Client(base_url=api_url, timeout=15.0)
+    try:
+        response = http.post("/recommend", json=payload)
+        response.raise_for_status()
+        return RecommendResponse.model_validate(response.json())
+    finally:
+        if owns_client:
+            http.close()
 
 _SEARCH_MODE_TO_API = {
     SEARCH_MODE_BOOLEAN: "boolean",
@@ -351,7 +388,9 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 ),
             )
 
-    tab_search, tab_ask, tab_image = st.tabs(["Buscar destinos", "Preguntar", "Buscar por imagen"])
+    tab_search, tab_ask, tab_image, tab_reco = st.tabs(
+        ["Buscar destinos", "Preguntar", "Buscar por imagen", "Recomendado para ti"]
+    )
 
     with tab_search:
         query = st.text_input(
@@ -386,6 +425,9 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
 
     with tab_image:
         _render_image_tab(st, top_k=top_k)
+
+    with tab_reco:
+        _render_recommend_tab(st)
 
 
 IMAGE_GALLERY_THRESHOLD = 3
@@ -609,6 +651,50 @@ def _render_profile_sidebar(st) -> None:  # pragma: no cover - Streamlit
     if st.button("Cambiar perfil", key="reset_profile_btn"):
         st.session_state.pop(PROFILE_SESSION_KEY, None)
         st.rerun()
+
+
+def _render_recommend_tab(st) -> None:  # pragma: no cover - Streamlit
+    """Render the 'Recomendado para ti' tab (T098).
+
+    Reads the synthetic profile from session state, calls ``/recommend``
+    and renders each destination as a card consistent with the other
+    tabs. The persona returned by the API is shown as a caption so the
+    user can see which segment drove the ranking.
+    """
+    st.subheader("Recomendado para ti")
+    user_id = selected_profile_user_id(st.session_state)
+    if not user_id:
+        st.info("Configura tu perfil en el onboarding para ver recomendaciones.")
+        return
+
+    top_k = st.slider(
+        "Cuántas recomendaciones",
+        min_value=1,
+        max_value=20,
+        value=RECOMMEND_TOP_K_DEFAULT,
+        step=1,
+        key="reco_top_k",
+    )
+
+    if not st.button("Cargar recomendaciones", type="primary", key="reco_btn"):
+        return
+
+    try:
+        response = fetch_recommendations(user_id, top_k=top_k)
+    except httpx.HTTPError as exc:
+        st.error(f"Error al consultar la API ({API_URL}): {exc}")
+        return
+
+    if response.empty or not response.results:
+        st.info("No hay recomendaciones disponibles todavía.")
+        return
+
+    if response.persona:
+        st.caption(f"Anclado al perfil: {response.persona}")
+
+    st.subheader(f"{len(response.results)} destino(s) sugerido(s)")
+    for rank, hit in enumerate(response.results, start=1):
+        _render_card(st, rank, hit)
 
 
 if __name__ == "__main__":  # pragma: no cover
