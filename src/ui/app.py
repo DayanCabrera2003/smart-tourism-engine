@@ -1,4 +1,4 @@
-"""T043/T044/T045/T047/T055/T066/T086 — Streamlit UI para consultar los endpoints de búsqueda.
+"""T043/T044/T045/T047/T055/T066/T086/T097 — Streamlit UI para consultar los endpoints de búsqueda.
 
 - T043: input de texto, botón de búsqueda y llamada HTTP a la API.
 - T044: cada resultado se renderiza como una tarjeta con nombre, país,
@@ -12,6 +12,8 @@
   Extendido / Semántico / Híbrido) y slider para el peso ``alpha``.
 - T066: añade el tab "Preguntar" con helpers ``ask_question`` y ``stream_ask``
   que consumen ``POST /ask`` y ``POST /ask/stream`` respectivamente.
+- T097: onboarding de perfil sintético; selección persistida en
+  ``st.session_state`` y disponible para la pestaña de recomendaciones.
 
 La lógica de llamada HTTP y los helpers viven como funciones puras para poder
 testearlos sin necesidad de levantar el runtime de Streamlit.
@@ -22,7 +24,16 @@ import os
 
 import httpx
 
-from src.api.schemas import AskResponse, DestinationResult, ImageSearchResponse, SearchResponse
+from src.api.schemas import (
+    AskResponse,
+    DestinationResult,
+    ImageSearchResponse,
+    SearchResponse,
+)
+from src.recommendation.synthetic_profiles import (
+    SYNTHETIC_PROFILE_DESCRIPTIONS,
+    list_synthetic_profile_ids,
+)
 
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
@@ -45,6 +56,50 @@ ALPHA_MIN = 0.0
 ALPHA_MAX = 1.0
 
 WEB_BADGE = "[Busqueda web]"
+
+PROFILE_SESSION_KEY = "user_profile_id"
+PROFILE_LABELS: dict[str, str] = {
+    "mochilero": "Mochilero",
+    "familia": "Familia",
+    "luna_de_miel": "Luna de miel",
+    "aventurero": "Aventurero",
+    "cultural": "Cultural",
+    "lujo": "Lujo",
+}
+
+
+def synthetic_profile_label(profile_id: str) -> str:
+    """Map a synthetic profile id to a human-readable label for the UI."""
+    return PROFILE_LABELS.get(profile_id, profile_id)
+
+
+def synthetic_profile_description(profile_id: str) -> str:
+    """Map a synthetic profile id to its Spanish description (T092)."""
+    return SYNTHETIC_PROFILE_DESCRIPTIONS.get(profile_id, "")
+
+
+def is_onboarding_complete(session_state: dict) -> bool:
+    """True when the user already picked a synthetic profile (T097)."""
+    return bool(session_state.get(PROFILE_SESSION_KEY))
+
+
+def store_selected_profile(session_state: dict, profile_id: str) -> None:
+    """Persist the chosen profile id into the Streamlit session state.
+
+    The id is stored without the ``synthetic:`` prefix so we can render it
+    by label, and added back to the prefix when calling ``/recommend``.
+    """
+    if profile_id not in PROFILE_LABELS:
+        raise ValueError(f"Unknown synthetic profile: {profile_id!r}")
+    session_state[PROFILE_SESSION_KEY] = profile_id
+
+
+def selected_profile_user_id(session_state: dict) -> str | None:
+    """Return the ``user_id`` (with synthetic: prefix) to send to the API."""
+    raw = session_state.get(PROFILE_SESSION_KEY)
+    if not raw:
+        return None
+    return f"synthetic:{raw}"
 
 _SEARCH_MODE_TO_API = {
     SEARCH_MODE_BOOLEAN: "boolean",
@@ -236,9 +291,15 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
 
     st.set_page_config(page_title="Smart Tourism Engine", page_icon=":mag:")
     st.title("Smart Tourism Engine")
-    st.caption("Booleano Extendido · Semantico · Hibrido")
+    st.caption("Booleano Extendido · Semantico · Hibrido · Recomendaciones")
+
+    if not is_onboarding_complete(st.session_state):
+        _render_onboarding(st)
+        return
 
     with st.sidebar:
+        _render_profile_sidebar(st)
+        st.divider()
         st.header("Modo de busqueda")
         mode = st.radio(
             "Modo",
@@ -508,6 +569,46 @@ def _render_image_results(st, resp: ImageSearchResponse) -> None:  # pragma: no 
                     st.image(hit.image_path, use_container_width=True)
                 except Exception:
                     st.caption(f"`{hit.image_path}`")
+
+
+def _render_onboarding(st) -> None:  # pragma: no cover - Streamlit
+    """Initial profile picker (T097).
+
+    Presents the six synthetic personas as radio buttons. The choice is
+    persisted into ``st.session_state`` so the rest of the UI can read
+    it without re-asking the user.
+    """
+    st.subheader("¿Qué tipo de viajero eres?")
+    st.caption(
+        "Elige el perfil que más se parezca a ti. "
+        "Lo usaremos para personalizar la sección 'Recomendado para ti'."
+    )
+
+    options = list_synthetic_profile_ids()
+    selection = st.radio(
+        "Perfil",
+        options=options,
+        index=0,
+        key="onboarding_radio",
+        format_func=synthetic_profile_label,
+    )
+    st.write(synthetic_profile_description(selection))
+
+    if st.button("Continuar", type="primary"):
+        store_selected_profile(st.session_state, selection)
+        st.rerun()
+
+
+def _render_profile_sidebar(st) -> None:  # pragma: no cover - Streamlit
+    """Show the active synthetic profile in the sidebar (T097)."""
+    raw = st.session_state.get(PROFILE_SESSION_KEY)
+    st.header("Tu perfil")
+    if raw:
+        st.markdown(f"**{synthetic_profile_label(raw)}**")
+        st.caption(synthetic_profile_description(raw))
+    if st.button("Cambiar perfil", key="reset_profile_btn"):
+        st.session_state.pop(PROFILE_SESSION_KEY, None)
+        st.rerun()
 
 
 if __name__ == "__main__":  # pragma: no cover

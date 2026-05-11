@@ -268,3 +268,30 @@ Cuando el modo es **Hibrido**, el sidebar muestra los tres parámetros:
 `top_k`, `p` (para la rama léxica) y `alpha` (peso de la fusión). En modo
 **Semántico** sólo aparece `top_k`, ya que el endpoint no consume `p` ni
 `alpha`.
+
+---
+
+## T097 — Onboarding de perfil de usuario
+
+Antes de mostrar las pestañas principales, la app pide al usuario que elija un perfil sintético. La selección queda en `st.session_state["user_profile_id"]` y persiste mientras dura la sesión del navegador.
+
+### Flujo
+
+1. Al abrir la app, si `st.session_state["user_profile_id"]` está vacío, se renderiza `_render_onboarding`: un radio con las seis personas de T092 y su descripción en español.
+2. El usuario elige un perfil y presiona "Continuar". `store_selected_profile` valida el id, lo persiste y el `st.rerun()` re-ejecuta la app con el sidebar y los tabs ya disponibles.
+3. El sidebar muestra el perfil activo y un botón "Cambiar perfil" que limpia la clave y vuelve al onboarding.
+
+### Helpers puros
+
+`src/ui/app.py` expone las funciones reutilizables por los tests:
+
+- `is_onboarding_complete(state)` → bool: indica si el perfil ya está fijado.
+- `store_selected_profile(state, profile_id)`: valida y persiste el id.
+- `selected_profile_user_id(state)` → str | None: devuelve `synthetic:<id>` listo para el endpoint `/recommend`.
+- `synthetic_profile_label` / `synthetic_profile_description`: mapeos id → etiquetas/textos en español.
+
+### Decisiones de diseño
+
+- **Persistencia en `st.session_state`**: el proyecto no tiene usuarios persistidos; la sesión del navegador es el contenedor natural. Si en el futuro se añade login, el helper sólo cambia de fuente sin tocar el resto de la UI.
+- **Almacenamos el id sin prefijo**: facilita la lectura en el sidebar; el prefijo `synthetic:` se reañade al armar `user_id` para `/recommend`.
+- **Botón "Cambiar perfil"**: el onboarding no es irreversible; explorar varias personas en la misma sesión cuesta dos clicks.
