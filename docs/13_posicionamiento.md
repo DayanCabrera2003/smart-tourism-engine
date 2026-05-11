@@ -82,3 +82,42 @@ donde `age_dias = max(0, (now - fetched_at) / 86400)` y `half_life = 180 días` 
 - **`fetched_at = None` → score 0**: si no podemos fechar el dato, no lo confiamos. Es estricto pero defensivo.
 - **Timestamps futuros clampeados a `now`**: clock skew o data tampering no debe inflar el score por encima de 1.0.
 
+---
+
+## T101 — Re-ranker combinado
+
+`src/retrieval/reranker.py` define `Reranker`, que toma los `top_k` resultados del recuperador y los reordena por una combinación convexa de cuatro señales.
+
+### Fórmula
+
+$$
+\mathrm{score_{final}}(d) = w_{rel} \cdot \mathrm{relevance}(d) + w_{pop} \cdot \mathrm{popularity}(d) + w_{fresh} \cdot \mathrm{freshness}(d) + w_{pers} \cdot \mathrm{personalization}(d)
+$$
+
+Con $\sum w_i = 1$ (los pesos se renormalizan al construir el objeto). Todos los componentes viven en $[0, 1]$, así que el resultado también.
+
+### Pesos por defecto
+
+| Peso | Valor | Justificación |
+|---|---|---|
+| `relevance` | **0.55** | El usuario pidió algo concreto; honrar esa intención es la prioridad. |
+| `popularity` | **0.20** | Empuja destinos sólidos del corpus a la superficie sin dominarla. |
+| `freshness` | **0.10** | Frescura es relevante pero secundaria a "encaja con la query". |
+| `personalization` | **0.15** | Bajo por defecto: solo se activa cuando hay perfil de usuario. |
+
+Las cuatro señales son **independientes**: la query manda quién compite, popularidad/frescura/personalización deciden el orden entre quienes ya pasaron el corte.
+
+### Componente de personalización
+
+Se calcula como coseno entre el embedding del perfil del usuario (T091) y el embedding del destino (Qdrant `destinations_text`). Decisiones:
+
+- **Coseno clampeado a $[0, 1]$**: un destino "anti-similar" (cos negativo) no se penaliza, solo no se boostea. Empujarlo hacia abajo sería castigar al usuario por no encajar perfectamente con su declaración.
+- **Sin embedding del usuario → peso redistribuido**: si el usuario es anónimo, el peso de personalización se redistribuye proporcionalmente entre los otros tres componentes. Eso preserva $\sum w_i = 1$ y el rango $[0, 1]$ del resultado.
+
+### Decisiones de diseño
+
+- **Pesos por estrategia**: el `Reranker` acepta `RerankWeights` por instancia. La UI puede crear varios reranqueadores con perfiles distintos: uno popularidad-heavy para la sección "Populares", otro personalización-heavy para "Recomendado para ti", todos compartiendo la misma estructura.
+- **Función pura sobre hits ya recuperados**: no toca Qdrant ni LLM. Su input son tuplas `(id, relevance)` y diccionarios laterales. Es trivial de testear y barato de ejecutar por request.
+- **Señales ausentes valen 0**: si un destino no tiene popularidad calculada o no está embebido, su componente correspondiente cuenta como cero en lugar de explotar. Esto permite degradar elegante con corpus parciales.
+
+
