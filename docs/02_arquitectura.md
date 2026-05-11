@@ -124,10 +124,31 @@ Todos los errores devueltos por la API siguen el mismo contrato JSON:
 | `HTTPException(404, ...)`             | 404      | `not_found`           |
 | `HTTPException(503, ...)` (sin índice)| 503      | `service_unavailable` |
 | `RequestValidationError` (Pydantic)   | 422      | `validation_error`    |
+| `qdrant_client.ResponseHandlingException` (T110) | 503 | `service_unavailable` |
+| `qdrant_client.UnexpectedResponse` (T110) | 503 | `service_unavailable` |
 | Excepción no controlada               | 500      | `internal_error`      |
 | Otros `HTTPException`                 | `exc.status_code` | `http_error` (fallback) |
 
 La tabla `_HTTP_CODE_MAP` en `middleware.py` concentra el mapeo `status_code → code`, evitando dispersión de literales entre handlers. Los códigos son identificadores estables pensados para que la UI y clientes externos discriminen casos sin parsear mensajes en español.
+
+### T110 — Robustez end-to-end
+
+Los smoke tests previos detectaron que cuatro endpoints (`/search/semantic`, `/search/hybrid`, `/ask`, `/recommend`) devolvían **500** cuando Qdrant no respondía, en lugar del 503 esperado. La causa: la excepción `ResponseHandlingException` de `qdrant-client` subía hasta el handler genérico de excepciones.
+
+T110 registra dos handlers nuevos en `middleware.install()`:
+
+- `ResponseHandlingException` → 503 `service_unavailable` con mensaje "Servicio vectorial (Qdrant) no disponible".
+- `UnexpectedResponse` → 503 con el mismo cuerpo.
+
+Esto cubre los cuatro endpoints semánticos sin tocar su código, porque el handler captura la excepción a nivel de aplicación.
+
+**Pruebas de robustez**: `tests/test_api_robustness.py` agrega 13 casos adversariales:
+
+- **422 validación**: query vacío, `top_k=0`, `top_k=999`, `p` fuera de rango, mode inválido, `alpha` fuera de rango, query ausente.
+- **200 happy path** con campo desconocido (Pydantic ignora extras).
+- **503 servicio caído** con `ResponseHandlingException` simulada.
+- **500 sin filtración** de stack trace cuando hay excepción no manejada — el body siempre es `{"code": "internal_error", "message": "Error interno del servidor."}`.
+- **Sanity**: el handler de Qdrant está efectivamente registrado en `app.exception_handlers`.
 
 ## Observabilidad
 

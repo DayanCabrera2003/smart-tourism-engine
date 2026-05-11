@@ -1,4 +1,4 @@
-"""T042 — Middleware de logging y manejo unificado de errores de la API.
+"""T042, T110 — Middleware de logging y manejo unificado de errores de la API.
 
 Centraliza dos responsabilidades transversales del servicio FastAPI:
 
@@ -8,6 +8,11 @@ Centraliza dos responsabilidades transversales del servicio FastAPI:
   ``{"code": str, "message": str}`` con un ``status_code`` consistente, de modo
   que la UI y los clientes externos puedan procesar errores sin ramificar por
   shape de payload.
+
+T110 añade dependencias externas como casos de primer nivel: fallos de
+Qdrant (`ResponseHandlingException`, `UnexpectedResponse`) se traducen
+a ``503`` con un mensaje explícito, en lugar de propagarse como 500
+opacos.
 """
 from __future__ import annotations
 
@@ -93,6 +98,31 @@ async def validation_exception_handler(
     return _error("validation_error", "Request payload inválido.", 422)
 
 
+async def qdrant_unavailable_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Translate Qdrant transport errors to 503 (T110).
+
+    When the dense retriever cannot reach Qdrant the qdrant-client
+    library raises ``ResponseHandlingException`` (connection refused,
+    DNS failure, timeout) or ``UnexpectedResponse`` (5xx upstream).
+    Both are infrastructure problems on our side; surfacing them as
+    ``503 service_unavailable`` lets the UI display a friendly message
+    instead of "Internal Server Error".
+    """
+    logger.warning(
+        "qdrant unavailable on %s %s: %s",
+        request.method,
+        request.url.path,
+        exc,
+    )
+    return _error(
+        "service_unavailable",
+        "Servicio vectorial (Qdrant) no disponible. Vuelve a intentarlo en unos momentos.",
+        503,
+    )
+
+
 async def unhandled_exception_handler(
     request: Request, exc: Exception
 ) -> JSONResponse:
@@ -109,4 +139,17 @@ def install(app: FastAPI) -> None:
     app.add_exception_handler(
         RequestValidationError, validation_exception_handler
     )
+
+    # T110: Qdrant transport errors become 503 instead of 500.
+    try:
+        from qdrant_client.http.exceptions import (
+            ResponseHandlingException,
+            UnexpectedResponse,
+        )
+
+        app.add_exception_handler(ResponseHandlingException, qdrant_unavailable_handler)
+        app.add_exception_handler(UnexpectedResponse, qdrant_unavailable_handler)
+    except ImportError:  # pragma: no cover - qdrant-client not installed
+        logger.warning("qdrant-client not installed; skipping Qdrant exception handler")
+
     app.add_exception_handler(Exception, unhandled_exception_handler)
