@@ -121,6 +121,12 @@ def _load_destinations_from_disk() -> dict[str, dict[str, object]]:
             "country": row["country"],
             "description": row["description"] or "",
             "image_urls": json.loads(row["image_urls"] or "[]"),
+            "popularity": row["popularity"] if "popularity" in row.keys() else None,
+            "fetched_at": (
+                row["fetched_at"].isoformat()
+                if row["fetched_at"] is not None
+                else None
+            ),
         }
     return out
 
@@ -241,6 +247,35 @@ RetrieverFactoryDep = Annotated[
 DestinationsDep = Annotated[dict[str, dict[str, object]], Depends(get_destinations)]
 
 
+def _build_destination_result(
+    doc_id: str,
+    score: float,
+    destinations: dict[str, dict[str, object]],
+    *,
+    payload: dict[str, object] | None = None,
+) -> DestinationResult:
+    """Compose a ``DestinationResult`` merging SQLite metadata and an
+    optional payload from Qdrant.
+
+    Centralized so every endpoint surfaces popularity (T099) and
+    fetched_at (T100) consistently without forgetting to wire one of
+    them per branch.
+    """
+    meta = destinations.get(doc_id) or {}
+    payload = payload or {}
+    image_urls = list(payload.get("image_urls") or meta.get("image_urls") or [])
+    return DestinationResult(
+        id=doc_id,
+        score=max(0.0, min(1.0, float(score))),
+        name=payload.get("name") or meta.get("name"),
+        country=payload.get("country") or meta.get("country"),
+        description=meta.get("description"),
+        image_urls=image_urls,
+        popularity=meta.get("popularity"),
+        fetched_at=meta.get("fetched_at"),
+    )
+
+
 @app.post("/search", response_model=SearchResponse)
 def search(
     request: SearchRequest,
@@ -251,19 +286,10 @@ def search(
     """Busca destinos con el Booleano Extendido (p-norm) y los devuelve rankeados."""
     retriever = retriever_factory(request.p)
     hits = retriever.search(request.query, index, top_k=request.top_k)
-    results: list[DestinationResult] = []
-    for doc_id, score in hits:
-        meta = destinations.get(doc_id) or {}
-        results.append(
-            DestinationResult(
-                id=doc_id,
-                score=score,
-                name=meta.get("name"),
-                country=meta.get("country"),
-                description=meta.get("description"),
-                image_urls=list(meta.get("image_urls") or []),
-            )
-        )
+    results = [
+        _build_destination_result(doc_id, score, destinations)
+        for doc_id, score in hits
+    ]
     return SearchResponse(results=results)
 
 
@@ -290,20 +316,15 @@ def search_semantic(
             detail=f"Búsqueda semántica no disponible: {exc}",
         ) from exc
 
-    results: list[DestinationResult] = []
-    for _point_id, score, payload in hits:
-        slug = str(payload.get("slug") or _point_id)
-        meta = destinations.get(slug) or {}
-        results.append(
-            DestinationResult(
-                id=slug,
-                score=max(0.0, min(1.0, float(score))),
-                name=payload.get("name") or meta.get("name"),
-                country=payload.get("country") or meta.get("country"),
-                description=meta.get("description"),
-                image_urls=list(payload.get("image_urls") or meta.get("image_urls") or []),
-            )
+    results = [
+        _build_destination_result(
+            str(payload.get("slug") or point_id),
+            float(score),
+            destinations,
+            payload=payload,
         )
+        for point_id, score, payload in hits
+    ]
     return SearchResponse(results=results)
 
 
@@ -327,19 +348,10 @@ def search_hybrid(
         alpha=request.alpha,
     )
     hits = hybrid.search(request.query, index, top_k=request.top_k)
-    results: list[DestinationResult] = []
-    for doc_id, score in hits:
-        meta = destinations.get(doc_id) or {}
-        results.append(
-            DestinationResult(
-                id=doc_id,
-                score=score,
-                name=meta.get("name"),
-                country=meta.get("country"),
-                description=meta.get("description"),
-                image_urls=list(meta.get("image_urls") or []),
-            )
-        )
+    results = [
+        _build_destination_result(doc_id, score, destinations)
+        for doc_id, score in hits
+    ]
     return SearchResponse(results=results)
 
 
@@ -534,20 +546,10 @@ def recommend(
         mode=request.mode,
         alpha=request.alpha,
     )
-    results: list[DestinationResult] = []
-    for doc_id, score, payload in outcome.hits:
-        meta = destinations.get(doc_id) or {}
-        clamped = max(0.0, min(1.0, float(score)))
-        results.append(
-            DestinationResult(
-                id=doc_id,
-                score=clamped,
-                name=payload.get("name") or meta.get("name"),
-                country=payload.get("country") or meta.get("country"),
-                description=meta.get("description"),
-                image_urls=list(payload.get("image_urls") or meta.get("image_urls") or []),
-            )
-        )
+    results = [
+        _build_destination_result(doc_id, score, destinations, payload=payload)
+        for doc_id, score, payload in outcome.hits
+    ]
     return RecommendResponse(
         results=results, persona=outcome.persona, empty=outcome.empty
     )

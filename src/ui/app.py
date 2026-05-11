@@ -37,6 +37,8 @@ from src.recommendation.synthetic_profiles import (
     SYNTHETIC_PROFILE_DESCRIPTIONS,
     list_synthetic_profile_ids,
 )
+from src.retrieval.freshness import freshness_score
+from src.retrieval.positioning import build_positioning_sections
 
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
@@ -72,6 +74,53 @@ PROFILE_LABELS: dict[str, str] = {
 RECOMMEND_TOP_K_DEFAULT = 6
 RECOMMEND_MODE_DEFAULT = "hybrid"
 RECOMMEND_ALPHA_DEFAULT = 0.6
+
+POSITIONING_SECTION_LABELS: dict[str, str] = {
+    "relevantes": "Más relevantes",
+    "populares": "Populares",
+    "recientes": "Recientes",
+    "variados": "Variados (por país)",
+}
+POSITIONING_SECTION_TOP_K = 5
+
+
+def build_positioning_sections_from_results(
+    results: list[DestinationResult],
+    *,
+    top_k: int = POSITIONING_SECTION_TOP_K,
+) -> dict[str, list[DestinationResult]]:
+    """Group ``DestinationResult`` items into the four UI sections (T103).
+
+    Extracts popularity/freshness/country from the results themselves
+    (the backend populates them when SQLite has the metadata) and
+    delegates the ordering to :func:`build_positioning_sections`. The
+    output reuses the same ``DestinationResult`` instances so the
+    cards rendered for each section share metadata and images.
+    """
+    if not results:
+        return {key: [] for key in POSITIONING_SECTION_LABELS}
+
+    hits = [(r.id, float(r.score)) for r in results]
+    by_id = {r.id: r for r in results}
+    popularity = {
+        r.id: float(r.popularity) for r in results if r.popularity is not None
+    }
+    freshness = {
+        r.id: freshness_score(r.fetched_at) for r in results if r.fetched_at
+    }
+    country_by_id: dict[str, str | None] = {r.id: r.country for r in results}
+
+    sections = build_positioning_sections(
+        hits,
+        popularity=popularity or None,
+        freshness=freshness or None,
+        country_by_id=country_by_id or None,
+        top_k=top_k,
+    )
+    return {
+        key: [by_id[doc_id] for doc_id, _ in section]
+        for key, section in sections.items()
+    }
 
 
 def synthetic_profile_label(profile_id: str) -> str:
@@ -401,6 +450,14 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 "En modo Semantico o Hibrido escribe en lenguaje natural."
             ),
         )
+        show_sections = st.checkbox(
+            "Agrupar por estrategia de posicionamiento (T103)",
+            value=False,
+            help=(
+                "Muestra los resultados en cuatro secciones: Más relevantes, "
+                "Populares, Recientes y Variados por país."
+            ),
+        )
         search_clicked = st.button("Buscar", type="primary")
 
         if search_clicked:
@@ -414,6 +471,8 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 else:
                     if not results:
                         st.info("Sin resultados para esta consulta.")
+                    elif show_sections:
+                        _render_positioning_sections(st, results)
                     else:
                         st.subheader(f"{len(results)} resultado(s) — modo: {mode}")
                         for rank, hit in enumerate(results, start=1):
@@ -695,6 +754,30 @@ def _render_recommend_tab(st) -> None:  # pragma: no cover - Streamlit
     st.subheader(f"{len(response.results)} destino(s) sugerido(s)")
     for rank, hit in enumerate(response.results, start=1):
         _render_card(st, rank, hit)
+
+
+def _render_positioning_sections(  # pragma: no cover - Streamlit
+    st, results: list[DestinationResult]
+) -> None:
+    """Render the four positioning sections inside expanders (T103).
+
+    Each section reuses ``_render_card`` so the visual layout matches
+    the regular search tab. The first section ("Más relevantes") is
+    open by default; the rest collapse to keep the page compact on
+    small screens.
+    """
+    sections = build_positioning_sections_from_results(results)
+    for key, label in POSITIONING_SECTION_LABELS.items():
+        section_results = sections.get(key, [])
+        if not section_results:
+            continue
+        is_first = key == "relevantes"
+        with st.expander(
+            f"{label} ({len(section_results)})",
+            expanded=is_first,
+        ):
+            for rank, hit in enumerate(section_results, start=1):
+                _render_card(st, rank, hit)
 
 
 if __name__ == "__main__":  # pragma: no cover

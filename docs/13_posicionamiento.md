@@ -161,5 +161,35 @@ MMR no puede operar sobre destinos no embebidos (no hay vector para medir simili
 - **Coseno reutilizado**: usa `cosine_similarity` de `src/retrieval/reranker.py` para no duplicar implementaciones del producto interno.
 - **MMR no es siempre la mejor opción**: para queries muy específicas ("museos en Madrid"), forzar diversidad puede empujar resultados peores arriba. El módulo es una herramienta, no se aplica por defecto en todas las búsquedas; la UI decide cuándo activarlo (T103).
 
+---
+
+## T103 — Secciones en la UI
+
+`src/retrieval/positioning.py` y `src/ui/app.py::build_positioning_sections_from_results` agrupan los mismos hits en cuatro secciones que el usuario puede expandir desde el tab de búsqueda.
+
+### Secciones
+
+| Sección | Estrategia | Cuándo es útil |
+|---|---|---|
+| **Más relevantes** | Ranking original del recuperador (Booleano / semántico / híbrido). | El usuario sabe lo que busca y quiere el orden que vino del back-end. |
+| **Populares** | Re-rank con `popularity_weight = 0.7` sobre los mismos hits. La relevancia sigue contando 0.3 para no degenerar a un top-N global. | Cuando la query es ambigua y se quiere ver primero los destinos más sólidos del corpus. |
+| **Recientes** | Re-rank con `freshness_weight = 0.7`. Frescura se calcula al vuelo desde `fetched_at` con `freshness_score` (T100). | Cuando la información cambia rápido (eventos, restricciones de viaje). |
+| **Variados (por país)** | Greedy: el primero por relevancia; cada siguiente debe ser un país nuevo hasta agotar países distintos; el resto rellena en orden de relevancia. | Para contrarrestar el sesgo geográfico del corpus (48 destinos de España de 206). |
+
+### Por qué no aplicar MMR para "Variados"
+
+La sección "Visualmente similares" del plan original asume el índice multimodal CLIP poblado, que en nuestro corpus está vacío (cero imágenes descargadas). En su lugar diversificamos por país, que es información presente en SQLite y se calcula sin tocar Qdrant ni CLIP. Cuando el índice de imágenes esté listo, basta cambiar el helper `diverse_by_country_section` por uno basado en `apply_mmr` con embeddings CLIP — la firma y el contrato hacia la UI siguen igual.
+
+### Fuente de las señales
+
+La UI no llama al backend N veces (una por sección). Las cuatro secciones se construyen en local a partir de un único `SearchResponse` que ahora trae `popularity` y `fetched_at` además de los campos previos. El backend popula esos campos desde la tabla SQLite `destinations`, así que la UI funciona aunque Qdrant esté caído (mientras tenga las metadatas en local).
+
+### Decisiones de diseño
+
+- **Helper centralizado en `src/api/main.py::_build_destination_result`**: los cuatro endpoints (`/search`, `/search/semantic`, `/search/hybrid`, `/recommend`) usan el mismo helper para componer la respuesta, evitando que un endpoint olvide propagar popularity o fetched_at.
+- **Fallback a relevancia si la señal falta**: si el corpus aún no tiene popularity (BD legacy sin migrar) o country (resultados de la búsqueda web Tavily), la sección correspondiente devuelve el orden de relevancia. La UI nunca tiene que manejar una clave faltante.
+- **Toggle opt-in**: el usuario marca "Agrupar por estrategia de posicionamiento". El render por defecto sigue siendo el listado lineal, para no penalizar a quien quiere el flujo directo.
+
+
 
 

@@ -83,6 +83,16 @@ class DestinationResult(BaseModel):
         False,
         description="True si el resultado proviene de la busqueda web (Tavily, T078).",
     )
+    popularity: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Score de popularidad del destino en [0,1] (T099). None si no se calculo aun.",
+    )
+    fetched_at: str | None = Field(
+        None,
+        description="Timestamp ISO de cuando se ingirio el destino (T100). Usado para frescura.",
+    )
 
 
 class HybridSearchRequest(BaseModel):
