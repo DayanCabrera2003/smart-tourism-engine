@@ -40,6 +40,7 @@ from src.recommendation.synthetic_profiles import (
 from src.retrieval.freshness import freshness_score
 from src.retrieval.positioning import build_positioning_sections
 from src.ui.i18n import DEFAULT_LOCALE, LOCALES, t
+from src.ui.theme import DEFAULT_THEME, THEMES, theme_css
 
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
@@ -64,6 +65,7 @@ ALPHA_MAX = 1.0
 WEB_BADGE = "[Busqueda web]"
 
 LOCALE_SESSION_KEY = "ui_locale"
+THEME_SESSION_KEY = "ui_theme"
 
 PROFILE_SESSION_KEY = "user_profile_id"
 PROFILE_LABELS: dict[str, str] = {
@@ -193,6 +195,23 @@ def store_selected_locale(session_state: dict, locale: str) -> None:
     if locale not in LOCALES:
         raise ValueError(f"Unknown locale: {locale!r}; expected one of {LOCALES}")
     session_state[LOCALE_SESSION_KEY] = locale
+
+
+def current_theme(session_state: dict) -> str:
+    """Return the theme stored in session state, or the default (T123)."""
+    theme = session_state.get(THEME_SESSION_KEY)
+    if theme in THEMES:
+        return theme
+    return DEFAULT_THEME
+
+
+def store_selected_theme(session_state: dict, theme: str) -> None:
+    """Persist the theme choice in ``st.session_state`` (T123)."""
+    if theme not in THEMES:
+        raise ValueError(
+            f"Unknown theme: {theme!r}; expected one of {tuple(THEMES.keys())}"
+        )
+    session_state[THEME_SESSION_KEY] = theme
 
 
 def synthetic_profile_label(profile_id: str) -> str:
@@ -448,8 +467,10 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
     import streamlit as st
 
     locale = current_locale(st.session_state)
+    theme = current_theme(st.session_state)
 
     st.set_page_config(page_title=t("app_title", locale), page_icon=":mag:")
+    st.markdown(theme_css(theme), unsafe_allow_html=True)
     st.title(t("app_title", locale))
     st.caption(t("app_caption", locale))
 
@@ -463,6 +484,18 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
         )
         if new_locale != locale:
             store_selected_locale(st.session_state, new_locale)
+            st.rerun()
+
+        theme_options = list(THEMES.keys())
+        new_theme = st.radio(
+            "Tema" if locale == "es" else "Theme",
+            options=theme_options,
+            index=theme_options.index(theme),
+            horizontal=True,
+            key="theme_radio",
+        )
+        if new_theme != theme:
+            store_selected_theme(st.session_state, new_theme)
             st.rerun()
 
     if not is_onboarding_complete(st.session_state):

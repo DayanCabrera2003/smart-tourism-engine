@@ -1,0 +1,16 @@
+# T123 - Streamlit theme defaults.
+#
+# We set base = "light" so the UI starts in light mode out of the box.
+# The sidebar exposes a runtime toggle that injects custom CSS to flip
+# to dark mode without reloading the app.
+
+[theme]
+base = "light"
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f6f8"
+textColor = "#1f2933"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
