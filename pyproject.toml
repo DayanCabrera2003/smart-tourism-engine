@@ -24,6 +24,7 @@ dependencies = [
     "python-multipart",
     "pillow",
     "matplotlib",
+    "prometheus-client",
 ]
 
 [project.optional-dependencies]

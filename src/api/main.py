@@ -68,6 +68,13 @@ app = FastAPI(
 )
 middleware.install(app)
 
+# T121: Prometheus instrumentation. Registered after the error
+# middleware so failed requests still contribute to the request
+# counter with their final status code.
+from src.api.metrics import install_metrics  # noqa: E402
+
+install_metrics(app)
+
 
 # ── Dependencias ──────────────────────────────────────────────────────────────
 

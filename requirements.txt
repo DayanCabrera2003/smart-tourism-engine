@@ -9,6 +9,7 @@ streamlit
 streamlit-folium
 folium
 matplotlib
+prometheus-client
 qdrant-client
 sentence-transformers
 python-multipart
