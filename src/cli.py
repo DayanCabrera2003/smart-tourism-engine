@@ -124,6 +124,122 @@ def embed_images_cmd(
     typer.echo(f"Embeddings de imágenes subidos a '{coll}': {total} puntos ({mode}).")
 
 
+@app.command("evaluate")
+def evaluate_cmd(
+    queries_path: str = typer.Option(
+        None,
+        "--queries",
+        help="Ruta al queries.json (default: data/eval/queries.json).",
+    ),
+    top_k: int = typer.Option(
+        10, "--top-k", min=1, help="Cutoff k para las métricas P/R/F1/nDCG."
+    ),
+    p: float = typer.Option(
+        2.0, "--p", min=1.0, help="Norma-p del Booleano Extendido."
+    ),
+    alpha: float = typer.Option(
+        0.5, "--alpha", min=0.0, max=1.0, help="Peso léxico en modo híbrido."
+    ),
+    output: str = typer.Option(
+        None,
+        "--output",
+        help="Ruta JSON para volcar el reporte completo (opcional).",
+    ),
+    modes: str = typer.Option(
+        "boolean,semantic,hybrid",
+        "--modes",
+        help="Lista separada por coma de modos a evaluar.",
+    ),
+):
+    """Evalúa los recuperadores contra queries.json y produce una tabla comparativa (T108)."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    from src.evaluation.retrievers import (
+        build_boolean_retriever,
+        build_hybrid_retriever,
+        build_semantic_retriever,
+    )
+    from src.evaluation.runner import (
+        EvaluationConfig,
+        ModeReport,
+        evaluate,
+        load_queries,
+    )
+
+    queries_file = (
+        _Path(queries_path)
+        if queries_path
+        else settings.DATA_DIR / "eval" / "queries.json"
+    )
+    if not queries_file.exists():
+        typer.echo(f"queries.json no encontrado en {queries_file}", err=True)
+        raise typer.Exit(code=1)
+
+    queries = load_queries(queries_file)
+    index_file = settings.DATA_DIR / "processed" / "index.pkl"
+    requested = [m.strip() for m in modes.split(",") if m.strip()]
+
+    retrievers: dict = {}
+    unavailable_reports: dict[str, ModeReport] = {}
+
+    for mode in requested:
+        try:
+            if mode == "boolean":
+                retrievers[mode] = build_boolean_retriever(index_file, p=p)
+            elif mode == "semantic":
+                retrievers[mode] = build_semantic_retriever()
+            elif mode == "hybrid":
+                retrievers[mode] = build_hybrid_retriever(
+                    index_file, p=p, alpha=alpha
+                )
+            else:
+                typer.echo(f"Modo desconocido: {mode}", err=True)
+                raise typer.Exit(code=1) from None
+        except Exception as exc:
+            unavailable_reports[mode] = ModeReport(
+                mode=mode, available=False, error=f"{type(exc).__name__}: {exc}"
+            )
+            typer.echo(
+                f"Modo '{mode}' no disponible: {type(exc).__name__}: {exc}",
+                err=True,
+            )
+
+    config = EvaluationConfig(top_k=top_k, queries_path=queries_file)
+    report = evaluate(retrievers, queries, config)
+    for mode, rep in unavailable_reports.items():
+        report.modes[mode] = rep
+
+    typer.echo("")
+    typer.echo(f"Reporte de evaluación — top_k={top_k}, queries={len(queries)}")
+    typer.echo("=" * 72)
+    header = ["mode", "P@k", "R@k", "F1@k", "MAP", "MRR", "nDCG@k", "available"]
+    typer.echo("\t".join(header))
+    for mode, rep in report.modes.items():
+        if not rep.available:
+            typer.echo(f"{mode}\t-\t-\t-\t-\t-\t-\tFalse ({rep.error})")
+            continue
+        summary = rep.as_summary()
+        row = [
+            mode,
+            f"{summary['P@k']:.4f}",
+            f"{summary['R@k']:.4f}",
+            f"{summary['F1@k']:.4f}",
+            f"{summary['MAP']:.4f}",
+            f"{summary['MRR']:.4f}",
+            f"{summary['nDCG@k']:.4f}",
+            "True",
+        ]
+        typer.echo("\t".join(row))
+
+    if output:
+        out_file = _Path(output)
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        with out_file.open("w") as fh:
+            _json.dump(report.to_json(), fh, ensure_ascii=False, indent=2)
+        typer.echo(f"\nReporte completo guardado en {out_file}")
+
+
 @ingest_app.command("wikivoyage")
 def ingest_wikivoyage_cmd():
     """
