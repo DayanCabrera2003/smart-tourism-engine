@@ -12,7 +12,7 @@ Este documento sirve como tabla de contenidos para el informe final del Proyecto
 8.  [08 - Pipeline RAG](08_rag.md)
 9.  [09 - Búsqueda Web (Fallback)](09_busqueda_web.md)
 10. [10 - Multimodalidad (CLIP)](10_multimodal.md)
-11. [11 - Recomendación](11_recommendation.md)
+11. [11 - Recomendación](11_recomendacion.md)
 12. [12 - Interfaz de Usuario](12_interfaz.md)
 13. [13 - Posicionamiento Avanzado](13_posicionamiento.md)
 14. [14 - Evaluación del Sistema](14_evaluacion.md)
