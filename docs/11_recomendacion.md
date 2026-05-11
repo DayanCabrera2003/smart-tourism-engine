@@ -120,5 +120,35 @@ Los seis personas son fijos durante el ciclo de vida del proceso, por lo que sus
 - **Perfiles sintéticos como sustitutos de cohortes**: cada persona representa un cluster ideal del catálogo, así que recomendar "lo que la persona X consumiría" se comporta como un colaborativo entre usuarios alineados a esa persona.
 - **Convergencia con el content-based al solapar señal**: cuando el usuario declara muchos intereses, su embedding se acerca a más de una persona; el recomendador resuelve el empate por coseno máximo, evitando volver al content-based puro.
 
+---
+
+## T095 — Recomendador híbrido
+
+`src/recommendation/hybrid.py` define `HybridRecommender`, que combina las dos ramas con un promedio ponderado.
+
+### Fórmula
+
+Para cada destino candidato $d$:
+
+$$
+\mathrm{score}_{\text{hybrid}}(d) = \alpha \cdot \mathrm{score}_{\text{content}}(d) + (1 - \alpha) \cdot \mathrm{score}_{\text{collab}}(d)
+$$
+
+con $\alpha \in [0, 1]$. Si una rama no devuelve $d$, su contribución es 0 (no se inventa similitud para suplir el hueco).
+
+### Estrategia de fusion
+
+1. Se piden `2 * top_k` candidatos a cada rama para tener material suficiente tras la unión.
+2. Se construye un diccionario `destination_id → score_fused` agregando ambas ramas.
+3. Se ordena descendente por `score_fused` y se devuelve `top_k`.
+4. El payload preserva el del content-based cuando ambas ramas devolvieron el destino; si solo aparece en colaborativo, se usa el payload de esa rama.
+
+### Decisiones de diseño
+
+- **`alpha=0.6` por defecto**: el content-based reacciona inmediatamente al perfil declarado, así que pesa un poco más; la rama colaborativa aporta diversidad sin dominar. El valor es configurable por request.
+- **Ramas independientes**: no se comparte estado entre ambas (la rama colaborativa hace su propio snapping). Esto evita acoplamientos sutiles y permite cachear los embeddings de personas dentro de la rama colaborativa sin afectar al content-based.
+- **Sin renormalización post-fusion**: los scores entrantes ya están en $[0, 1]$ (coseno), por lo que el resultado fundido permanece en el mismo rango. Esto permite tratar el score como una "similitud" consistente con los modos de búsqueda.
+
+
 
 
