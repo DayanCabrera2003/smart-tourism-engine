@@ -39,6 +39,7 @@ from src.recommendation.synthetic_profiles import (
 )
 from src.retrieval.freshness import freshness_score
 from src.retrieval.positioning import build_positioning_sections
+from src.ui.i18n import DEFAULT_LOCALE, LOCALES, t
 
 DEFAULT_API_URL = "http://localhost:8000"
 API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
@@ -61,6 +62,8 @@ ALPHA_MIN = 0.0
 ALPHA_MAX = 1.0
 
 WEB_BADGE = "[Busqueda web]"
+
+LOCALE_SESSION_KEY = "ui_locale"
 
 PROFILE_SESSION_KEY = "user_profile_id"
 PROFILE_LABELS: dict[str, str] = {
@@ -175,6 +178,21 @@ def build_positioning_sections_from_results(
         key: [by_id[doc_id] for doc_id, _ in section]
         for key, section in sections.items()
     }
+
+
+def current_locale(session_state: dict) -> str:
+    """Return the locale stored in session state, or the default (T116)."""
+    locale = session_state.get(LOCALE_SESSION_KEY)
+    if locale in LOCALES:
+        return locale
+    return DEFAULT_LOCALE
+
+
+def store_selected_locale(session_state: dict, locale: str) -> None:
+    """Persist the locale choice in ``st.session_state`` (T116)."""
+    if locale not in LOCALES:
+        raise ValueError(f"Unknown locale: {locale!r}; expected one of {LOCALES}")
+    session_state[LOCALE_SESSION_KEY] = locale
 
 
 def synthetic_profile_label(profile_id: str) -> str:
@@ -429,9 +447,23 @@ def stream_ask(
 def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
     import streamlit as st
 
-    st.set_page_config(page_title="Smart Tourism Engine", page_icon=":mag:")
-    st.title("Smart Tourism Engine")
-    st.caption("Booleano Extendido · Semantico · Hibrido · Recomendaciones")
+    locale = current_locale(st.session_state)
+
+    st.set_page_config(page_title=t("app_title", locale), page_icon=":mag:")
+    st.title(t("app_title", locale))
+    st.caption(t("app_caption", locale))
+
+    with st.sidebar:
+        new_locale = st.radio(
+            t("language_label", locale),
+            options=list(LOCALES),
+            index=list(LOCALES).index(locale),
+            horizontal=True,
+            key="locale_radio",
+        )
+        if new_locale != locale:
+            store_selected_locale(st.session_state, new_locale)
+            st.rerun()
 
     if not is_onboarding_complete(st.session_state):
         _render_onboarding(st)
