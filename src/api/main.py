@@ -40,6 +40,8 @@ from src.api.schemas import (
     AskRequest,
     AskResponse,
     DestinationResult,
+    FeedbackRequest,
+    FeedbackResponse,
     HybridSearchRequest,
     ImageByTextRequest,
     ImageSearchResponse,
@@ -557,6 +559,32 @@ def recommend(
     return RecommendResponse(
         results=results, persona=outcome.persona, empty=outcome.empty
     )
+
+
+@app.post("/feedback", response_model=FeedbackResponse)
+def feedback(request: FeedbackRequest) -> FeedbackResponse:
+    """Registra un voto de relevancia thumbs up/down (T118).
+
+    Persiste tal cual en SQLite; los agregadores deciden cómo combinar
+    los votos. El payload duplicado para el mismo (usuario, query,
+    destino) está permitido para que el usuario pueda cambiar de opinión.
+    """
+    from fastapi import HTTPException
+
+    from src.ingestion.feedback import VALID_VOTES, record_feedback
+
+    if request.vote not in VALID_VOTES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"vote must be one of {VALID_VOTES}; got {request.vote}",
+        )
+    new_id = record_feedback(
+        request.user_id,
+        request.query,
+        request.destination_id,
+        request.vote,
+    )
+    return FeedbackResponse(id=new_id)
 
 
 @app.post("/ask/stream")

@@ -276,6 +276,26 @@ class RecommendResponse(BaseModel):
     )
 
 
+class FeedbackRequest(BaseModel):
+    """Cuerpo del ``POST /feedback`` (T118).
+
+    El cliente envía un voto por (usuario, query, destino). Valores
+    válidos: ``+1`` (pulgar arriba) y ``-1`` (pulgar abajo). El servidor
+    persiste la fila tal cual; los agregadores deciden cómo combinarlas.
+    """
+
+    user_id: str = Field(..., min_length=1, max_length=128)
+    query: str = Field(..., min_length=1, max_length=512)
+    destination_id: str = Field(..., min_length=1, max_length=256)
+    vote: int = Field(..., description="+1 pulgar arriba, -1 pulgar abajo")
+
+
+class FeedbackResponse(BaseModel):
+    """Respuesta del ``POST /feedback``."""
+
+    id: int = Field(..., description="Id de la fila persistida en SQLite.")
+
+
 class AskRequest(BaseModel):
     """Cuerpo del ``POST /ask`` y ``POST /ask/stream``."""
 
