@@ -75,3 +75,25 @@ El campo `review_status: "pending_human_validation"` señala que las anotaciones
 - El corpus es **mono-idioma inglés** (Wikivoyage). Las queries en español funcionan porque los modos semántico y híbrido usan un embedder multilingüe (`all-MiniLM-L6-v2`), pero el modo booleano tiene desventaja inherente con queries en español.
 - Las reglas de keyword usan **whole-word matching** (`\bbeach\b`), no stemming. Esto se hace porque el ground truth debe ser literalmente verificable; el recuperador es el que aplica stemming.
 - No hay queries adversariales (típos, sinónimos exóticos, dominios fuera de turismo). Se podrían añadir como segunda iteración.
+
+---
+
+## T106 — Precision@k, Recall@k, F1@k
+
+`src/evaluation/metrics.py` define los tres clásicos por consulta.
+
+### Definiciones
+
+| Métrica | Fórmula | Interpretación |
+|---|---|---|
+| **Precision@k** | $\frac{\|\{ \text{relevantes} \cap \text{top-}k \}\|}{k}$ | Fracción del top-k que es relevante. Si pides 10 y 3 son útiles, P@10 = 0.30. |
+| **Recall@k** | $\frac{\|\{ \text{relevantes} \cap \text{top-}k \}\|}{\|\text{relevantes}\|}$ | Fracción de los relevantes que se recuperaron. |
+| **F1@k** | $\frac{2 \cdot P \cdot R}{P + R}$ | Media armónica; 0 cuando no hay aciertos. |
+
+### Convenciones de borde
+
+- **k fijo aunque la lista sea corta**: si el recuperador devuelve solo 2 documentos pero el usuario pidió k=5, el denominador de P@5 sigue siendo 5. Eso penaliza correctamente la sub-entrega.
+- **Sin relevantes → 0.0**: si una query tiene ground truth vacío, las tres métricas devuelven 0.0 en lugar de NaN o excepción para que la media sobre el batch siga siendo calculable.
+- **k inválido → excepción**: `k <= 0` o no-entero hacen fallar la llamada inmediatamente. Mejor un error claro que un cálculo silenciosamente roto.
+
+
