@@ -39,6 +39,7 @@ from src.recommendation.synthetic_profiles import (
 )
 from src.retrieval.freshness import freshness_score
 from src.retrieval.positioning import build_positioning_sections
+from src.ui.accessibility import image_alt
 from src.ui.i18n import DEFAULT_LOCALE, LOCALES, t
 from src.ui.theme import DEFAULT_THEME, THEMES, theme_css
 
@@ -634,34 +635,46 @@ def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no c
             meta_bits.append(f":earth_americas: {hit.country}")
         meta_bits.append(f"`{hit.id}`")
         header.caption(" · ".join(meta_bits))
-        _render_image_gallery(st, hit.image_urls)
+        _render_image_gallery(st, hit.image_urls, hit)
         description = truncate_description(hit.description)
         if description:
             st.write(description)
 
 
-def _render_image_gallery(st, image_urls: list[str] | None) -> None:  # pragma: no cover
-    """Muestra las imágenes del destino (T087).
+def _render_image_gallery(  # pragma: no cover - Streamlit
+    st,
+    image_urls: list[str] | None,
+    hit: DestinationResult | None = None,
+) -> None:
+    """Muestra las imágenes del destino (T087) con alt text accesible (T124).
 
     Si hay 1 imagen, la muestra a ancho completo.
     Si hay varias, las muestra en un grid de hasta 3 columnas.
+    Cuando se pasa ``hit`` se usa su metadata para generar el alt text
+    de cada imagen (``image_alt``); de lo contrario cae al texto
+    genérico del fallback.
     """
     valid_urls = [u for u in (image_urls or []) if isinstance(u, str) and u.strip()]
     if not valid_urls:
         return
+    alt = image_alt(
+        name=hit.name if hit else None,
+        country=hit.country if hit else None,
+        description=hit.description if hit else None,
+    )
     if len(valid_urls) == 1:
         try:
-            st.image(valid_urls[0], use_container_width=True)
+            st.image(valid_urls[0], caption=alt, use_container_width=True)
         except Exception:
-            st.caption("Imagen no disponible.")
+            st.caption(alt)
         return
     cols = st.columns(min(len(valid_urls), IMAGE_GALLERY_THRESHOLD))
     for idx, url in enumerate(valid_urls[: IMAGE_GALLERY_THRESHOLD * 2]):
         col = cols[idx % IMAGE_GALLERY_THRESHOLD]
         try:
-            col.image(url, use_container_width=True)
+            col.image(url, caption=alt, use_container_width=True)
         except Exception:
-            col.caption("N/D")
+            col.caption(alt)
 
 
 def _render_ask_tab(st, *, top_k: int, mode: str, alpha: float) -> None:  # pragma: no cover
@@ -796,8 +809,9 @@ def _render_image_results(st, resp: ImageSearchResponse) -> None:  # pragma: no 
             col_info.markdown(f"**{hit.destination_id}**")
             col_score.metric("score", f"{hit.score:.3f}")
             if hit.image_path:
+                alt = image_alt(name=hit.destination_id)
                 try:
-                    st.image(hit.image_path, use_container_width=True)
+                    st.image(hit.image_path, caption=alt, use_container_width=True)
                 except Exception:
                     st.caption(f"`{hit.image_path}`")
 
