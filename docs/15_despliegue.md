@@ -54,7 +54,10 @@ El sistema se configura a través de variables de entorno que pueden definirse e
 | Variable | Descripción | Valor por Defecto |
 |----------|-------------|-------------------|
 | `QDRANT_URL` | Dirección de la base vectorial Qdrant. | `http://localhost:6333` |
-| `LLM_API_KEY` | Clave API para el servicio LLM (ej. Groq). | `None` |
+| `LLM_API_KEY` | Clave API para Gemini (modelo LLM por defecto). | `None` |
+| `LLM_PROVIDER` | Proveedor del LLM: `gemini` (default) u `ollama` para uso offline. | `gemini` |
+| `OLLAMA_URL` | URL base de Ollama (solo si `LLM_PROVIDER=ollama`). | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Modelo de Ollama (solo si `LLM_PROVIDER=ollama`). | `llama3` |
 | `LOG_LEVEL` | Nivel de verbosidad de los logs del sistema. | `INFO` |
 | `DATA_DIR` | Ruta base para el almacenamiento de datos. | `data` |
 
