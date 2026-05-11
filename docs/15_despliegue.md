@@ -58,6 +58,50 @@ El sistema se configura a través de variables de entorno que pueden definirse e
 | `LLM_PROVIDER` | Proveedor del LLM: `gemini` (default) u `ollama` para uso offline. | `gemini` |
 | `OLLAMA_URL` | URL base de Ollama (solo si `LLM_PROVIDER=ollama`). | `http://localhost:11434` |
 | `OLLAMA_MODEL` | Modelo de Ollama (solo si `LLM_PROVIDER=ollama`). | `llama3` |
+
+## T114 — Generar el informe final en PDF
+
+El sistema incluye un script reproducible para concatenar los markdowns de `docs/` y producir un PDF estilo LNCS.
+
+### Requisitos
+
+- **pandoc** (no está incluido en las dependencias Python).
+- Un motor LaTeX: **xelatex** (preferido por Unicode) o **pdflatex** como fallback.
+
+Instalación según sistema:
+
+```bash
+# Fedora / RHEL
+sudo dnf install pandoc texlive-scheme-medium
+
+# Debian / Ubuntu
+sudo apt install pandoc texlive-xetex texlive-fonts-recommended
+
+# macOS (brew)
+brew install pandoc basictex
+```
+
+### Ejecución
+
+```bash
+# Build a docs/informe_final.pdf
+./scripts/build_pdf.sh
+
+# Build a una ruta custom
+./scripts/build_pdf.sh /tmp/sri_informe.pdf
+```
+
+El script:
+
+1. Verifica que `pandoc` esté en `$PATH`; si no, imprime instrucciones por sistema y sale con `exit 1`.
+2. Elige `xelatex` si está disponible, si no `pdflatex`.
+3. Concatena los 17 capítulos (`docs/01_dominio.md` ... `docs/17_critica_y_deficiencias.md` + `bibliografia.md`) en el orden de `docs/00_indice.md`.
+4. Inyecta metadatos (título, autor, fecha) y genera tabla de contenidos numerada hasta nivel 2.
+5. Aplica papel A4, márgenes 2.5 cm, fuente DejaVu Sans 11pt.
+
+### Estado en esta entrega
+
+En el entorno donde se preparó la entrega `pandoc` no estaba instalado. El script está versionado y listo para correr en cuanto se instale la herramienta. La ejecución sin pandoc devuelve un error explícito con las instrucciones, en lugar de fallar silenciosamente.
 | `LOG_LEVEL` | Nivel de verbosidad de los logs del sistema. | `INFO` |
 | `DATA_DIR` | Ruta base para el almacenamiento de datos. | `data` |
 
