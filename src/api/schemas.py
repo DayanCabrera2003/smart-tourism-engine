@@ -93,6 +93,18 @@ class DestinationResult(BaseModel):
         None,
         description="Timestamp ISO de cuando se ingirio el destino (T100). Usado para frescura.",
     )
+    latitude: float | None = Field(
+        None,
+        ge=-90.0,
+        le=90.0,
+        description="Latitud del destino en grados (T104). None si no hay coordenadas.",
+    )
+    longitude: float | None = Field(
+        None,
+        ge=-180.0,
+        le=180.0,
+        description="Longitud del destino en grados (T104). None si no hay coordenadas.",
+    )
 
 
 class HybridSearchRequest(BaseModel):

@@ -83,6 +83,60 @@ POSITIONING_SECTION_LABELS: dict[str, str] = {
 }
 POSITIONING_SECTION_TOP_K = 5
 
+MAP_ZOOM_DEFAULT = 4
+MAP_HEIGHT_PX = 480
+
+
+def results_with_coordinates(
+    results: list[DestinationResult],
+) -> list[DestinationResult]:
+    """Filter ``results`` to those that have usable lat/lon (T104)."""
+    return [
+        r
+        for r in results
+        if r.latitude is not None and r.longitude is not None
+    ]
+
+
+def map_center(
+    results: list[DestinationResult],
+) -> tuple[float, float] | None:
+    """Compute the center of the map as the centroid of geocoded results.
+
+    Returns ``None`` when no result has coordinates so the caller can
+    render an empty-state message instead of a default-centered map.
+    """
+    geocoded = results_with_coordinates(results)
+    if not geocoded:
+        return None
+    avg_lat = sum(r.latitude for r in geocoded) / len(geocoded)
+    avg_lon = sum(r.longitude for r in geocoded) / len(geocoded)
+    return avg_lat, avg_lon
+
+
+def build_marker_popup_html(result: DestinationResult) -> str:
+    """Render a small HTML snippet for a marker popup (T104).
+
+    Kept as a pure helper so the test suite can verify it without
+    booting Streamlit. The HTML is escaped at boundary points to avoid
+    breaking the popup with quotation marks in the destination name or
+    description.
+    """
+    import html
+
+    name = html.escape(result.name or result.id)
+    country = html.escape(result.country or "")
+    description = html.escape((result.description or "").strip())
+    if len(description) > 200:
+        description = description[:199].rstrip() + "…"
+    parts = [f"<strong>{name}</strong>"]
+    if country:
+        parts.append(f"<br><em>{country}</em>")
+    parts.append(f"<br><span>score: {result.score:.3f}</span>")
+    if description:
+        parts.append(f"<br><br>{description}")
+    return "".join(parts)
+
 
 def build_positioning_sections_from_results(
     results: list[DestinationResult],
@@ -458,6 +512,14 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 "Populares, Recientes y Variados por país."
             ),
         )
+        show_map = st.checkbox(
+            "Mostrar mapa interactivo (T104)",
+            value=False,
+            help=(
+                "Renderiza los resultados con coordenadas en un mapa con "
+                "marcadores. Click en un marcador para ver el detalle."
+            ),
+        )
         search_clicked = st.button("Buscar", type="primary")
 
         if search_clicked:
@@ -471,12 +533,15 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 else:
                     if not results:
                         st.info("Sin resultados para esta consulta.")
-                    elif show_sections:
-                        _render_positioning_sections(st, results)
                     else:
-                        st.subheader(f"{len(results)} resultado(s) — modo: {mode}")
-                        for rank, hit in enumerate(results, start=1):
-                            _render_card(st, rank, hit)
+                        if show_map:
+                            _render_results_map(st, results)
+                        if show_sections:
+                            _render_positioning_sections(st, results)
+                        else:
+                            st.subheader(f"{len(results)} resultado(s) — modo: {mode}")
+                            for rank, hit in enumerate(results, start=1):
+                                _render_card(st, rank, hit)
 
     with tab_ask:
         api_mode = _SEARCH_MODE_TO_API.get(mode, "hybrid")
@@ -754,6 +819,40 @@ def _render_recommend_tab(st) -> None:  # pragma: no cover - Streamlit
     st.subheader(f"{len(response.results)} destino(s) sugerido(s)")
     for rank, hit in enumerate(response.results, start=1):
         _render_card(st, rank, hit)
+
+
+def _render_results_map(  # pragma: no cover - Streamlit
+    st, results: list[DestinationResult]
+) -> None:
+    """Render the interactive Folium map of geocoded results (T104).
+
+    Imports are lazy so the rest of the app keeps booting on systems
+    without streamlit-folium installed (e.g. CI doing lint only).
+    """
+    import folium
+    from streamlit_folium import st_folium
+
+    geocoded = results_with_coordinates(results)
+    if not geocoded:
+        st.info(
+            "Ninguno de los resultados tiene coordenadas para mostrar en el mapa."
+        )
+        return
+
+    center = map_center(geocoded)
+    fmap = folium.Map(location=list(center), zoom_start=MAP_ZOOM_DEFAULT)
+    for rank, result in enumerate(geocoded, start=1):
+        popup_html = build_marker_popup_html(result)
+        folium.Marker(
+            location=[result.latitude, result.longitude],
+            tooltip=f"{rank}. {result.name or result.id}",
+            popup=folium.Popup(popup_html, max_width=320),
+        ).add_to(fmap)
+
+    st.caption(
+        f"{len(geocoded)} de {len(results)} resultados tienen coordenadas."
+    )
+    st_folium(fmap, height=MAP_HEIGHT_PX, use_container_width=True)
 
 
 def _render_positioning_sections(  # pragma: no cover - Streamlit

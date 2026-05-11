@@ -6,6 +6,8 @@ python-dotenv
 typer
 httpx
 streamlit
+streamlit-folium
+folium
 qdrant-client
 sentence-transformers
 python-multipart

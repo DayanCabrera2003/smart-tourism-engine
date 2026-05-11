@@ -18,6 +18,8 @@ dependencies = [
     "httpx",
     "nltk",
     "streamlit",
+    "streamlit-folium",
+    "folium",
     "google-genai",
     "python-multipart",
     "pillow",

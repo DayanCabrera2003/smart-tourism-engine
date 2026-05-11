@@ -127,6 +127,8 @@ def _load_destinations_from_disk() -> dict[str, dict[str, object]]:
                 if row["fetched_at"] is not None
                 else None
             ),
+            "lat": row["lat"] if "lat" in row.keys() else None,
+            "lon": row["lon"] if "lon" in row.keys() else None,
         }
     return out
 
@@ -273,6 +275,8 @@ def _build_destination_result(
         image_urls=image_urls,
         popularity=meta.get("popularity"),
         fetched_at=meta.get("fetched_at"),
+        latitude=meta.get("lat"),
+        longitude=meta.get("lon"),
     )
 
 

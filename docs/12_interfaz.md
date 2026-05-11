@@ -313,3 +313,18 @@ Antes de mostrar las pestañas principales, la app pide al usuario que elija un 
 - **Reuso de `_render_card`**: las tarjetas de Recomendado para ti respetan el mismo layout que las de Buscar, evitando una UI inconsistente.
 - **Modo `hybrid` fijo**: ofrecer al usuario elegir entre content/collaborative/hybrid agregaría fricción sin valor claro; el híbrido cubre los dos extremos.
 - **Carga bajo demanda**: no se llama al endpoint en cada `rerun`; solo cuando el usuario lo solicita. Mantiene la pestaña barata si el usuario solo viene a buscar.
+
+## T103 — Secciones por estrategia de posicionamiento
+
+El tab de búsqueda incluye un checkbox "Agrupar por estrategia de posicionamiento" que reorganiza los mismos hits en cuatro expanders:
+
+- **Más relevantes** (expandido por defecto): ranking original.
+- **Populares**: re-rank con peso 0.7 sobre `Destination.popularity`.
+- **Recientes**: re-rank con peso 0.7 sobre frescura calculada de `fetched_at`.
+- **Variados (por país)**: greedy que prioriza países distintos.
+
+La lógica está en `src/retrieval/positioning.py` y en `build_positioning_sections_from_results` (helper puro de la UI). Toda la composición sucede en el cliente a partir de un único `SearchResponse`; no hay round-trips adicionales.
+
+## T104 — Mapa interactivo
+
+Otro toggle del tab de búsqueda renderiza un mapa Folium con los destinos geocodificados. Coordenadas vienen de `DestinationResult.latitude/longitude` que el backend popula desde SQLite. Si SQLite no tiene las coords, el mapa muestra "Ninguno de los resultados tiene coordenadas".

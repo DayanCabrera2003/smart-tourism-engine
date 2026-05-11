@@ -190,6 +190,38 @@ La UI no llama al backend N veces (una por sección). Las cuatro secciones se co
 - **Fallback a relevancia si la señal falta**: si el corpus aún no tiene popularity (BD legacy sin migrar) o country (resultados de la búsqueda web Tavily), la sección correspondiente devuelve el orden de relevancia. La UI nunca tiene que manejar una clave faltante.
 - **Toggle opt-in**: el usuario marca "Agrupar por estrategia de posicionamiento". El render por defecto sigue siendo el listado lineal, para no penalizar a quien quiere el flujo directo.
 
+---
+
+## T104 — Mapa interactivo
+
+El tab de búsqueda ofrece un toggle "Mostrar mapa interactivo" que renderiza los destinos geocodificados sobre un mapa Folium usando `streamlit-folium`.
+
+### Comportamiento
+
+1. La UI llama al endpoint de búsqueda como siempre.
+2. `results_with_coordinates(results)` filtra los `DestinationResult` que tienen `latitude` y `longitude`. Resultados con coordenadas parciales (solo una de las dos) se tratan como ausentes.
+3. `map_center(results)` calcula el centroide promedio para centrar el mapa.
+4. Cada destino se renderiza como un `folium.Marker` con tooltip (`rank. name`) y popup HTML generado por `build_marker_popup_html`.
+5. La UI muestra una caption con la fracción de resultados con coordenadas (`179 de 206 tienen coords`).
+
+### Popup HTML
+
+Se construye en una función pura para poder testearla sin Streamlit:
+
+- Negrita: nombre del destino (o id si no hay nombre).
+- Itálica: país (omitido si no hay).
+- Score formateado a tres decimales.
+- Descripción truncada a 199 chars + elipsis si es larga.
+- Caracteres especiales se escapan con `html.escape` para evitar romper el popup con comillas o `<script>` en la descripción.
+
+### Decisiones de diseño
+
+- **Imports lazy de folium**: la app no debe romper en sistemas que solo corren tests/lint y no instalan `streamlit-folium`. Los imports están dentro de `_render_results_map`.
+- **Coordenadas como campos opcionales en `DestinationResult`**: con validación `[-90, 90]` para lat y `[-180, 180]` para lon. Resultados sin coordenadas (búsqueda web Tavily, destinos legacy) no rompen el mapa; simplemente quedan fuera de la capa de marcadores.
+- **Cobertura del corpus**: 179 de 206 destinos de Wikivoyage traen coordenadas (Wikivoyage no las expone para subdistritos y barrios). El 13% restante aparece en la lista lineal pero no en el mapa, lo cual la UI explicita en la caption.
+- **Sin layer extra de popularidad/frescura en el mapa**: el mapa no es el lugar para rankear; es el lugar para ubicar geográficamente. Mantenerlo simple evita iconos rojos/verdes que el usuario tiene que interpretar.
+
+
 
 
 
