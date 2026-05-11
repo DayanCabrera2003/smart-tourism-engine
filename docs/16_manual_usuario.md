@@ -246,14 +246,123 @@ pytest tests/test_api_robustness.py -q
 
 ---
 
-## 7. Guión de la demo (T115)
+## 7. Guión de la demo final (T115)
 
-Para una demo de 10 minutos:
+Demo de **10 minutos** que recorre toda la pila terminada en Corte 3. Pensado para ejecutarse delante del tribunal con el sistema corriendo en local.
 
-1. **0-1 min**: Mostrar el problema y los seis perfiles de usuario.
-2. **1-3 min**: Búsqueda léxica con `AND`/`OR` y deslizar `p` para mostrar el efecto del p-norm.
-3. **3-5 min**: Cambiar a modo Híbrido, mostrar diferencias en queries en lenguaje natural.
-4. **5-7 min**: Tab Preguntar — pregunta con citaciones y streaming.
-5. **7-8 min**: Tab Recomendado para ti — cambiar perfil y observar cambios.
-6. **8-9 min**: Activar el mapa interactivo y las secciones de posicionamiento.
-7. **9-10 min**: Mostrar el reporte de evaluación y discutir los trade-offs entre modos.
+### Preparación (5 minutos antes de la demo)
+
+```bash
+# Verificar entorno
+source venv/bin/activate
+python -c "import sys; print(sys.version)"     # 3.11+
+
+# Levantar Qdrant (terminal 1)
+docker run -p 6333:6333 -v $(pwd)/qdrant_storage:/qdrant/storage qdrant/qdrant
+
+# Asegurarse de que la API arrancó limpia (terminal 2)
+uvicorn src.api.main:app --reload
+
+# UI (terminal 3)
+streamlit run src/ui/app.py
+```
+
+Checklist pre-demo:
+
+- [ ] `curl http://localhost:8000/health` responde `{"status":"ok"}`.
+- [ ] `curl http://localhost:6333/collections` lista `destinations_text`.
+- [ ] La UI carga sin errores en el navegador.
+- [ ] `LLM_API_KEY` está configurada y `/ask` responde sin 503.
+- [ ] El monitor está en resolución 1920x1080 mínimo para que las gráficas se vean.
+
+### 0:00 - 1:00 — Contexto del problema
+
+- Abrir [docs/01_dominio.md](01_dominio.md) en pantalla.
+- Explicar la motivación: "buscar destinos turísticos en lenguaje natural sin terminar en un buscador genérico con resultados comerciales".
+- Mencionar los seis perfiles de viajero como segmentación natural del dominio.
+- Mostrar las cinco modalidades soportadas (léxica, semántica, híbrida, conversacional, multimodal, recomendación).
+
+### 1:00 - 2:30 — Recuperador léxico con p-norm
+
+- Abrir la UI en modo **Booleano Extendido**.
+- Query: `playa AND mar`. Mostrar resultados.
+- Mover el slider `p` de 1.0 a 10.0. Observar cómo el orden cambia (con `p` alto, AND se vuelve estricto). Explicar la interpolación Salton/Fox/Wu (citar [docs/03_modelo_ri.md](03_modelo_ri.md)).
+- Query: `madrid`. Mostrar top-1 = wikivoyage-madrid con score 0.589.
+
+### 2:30 - 4:00 — Búsqueda semántica e híbrida
+
+- Cambiar a modo **Semántico**.
+- Query: `playas tranquilas para luna de miel`. Mostrar que devuelve destinos relevantes aunque ninguno contenga literalmente la palabra "luna de miel".
+- Cambiar a modo **Híbrido** con `alpha=0.5`. Misma query.
+- Mover `alpha` para mostrar la transición entre puro semántico y puro léxico.
+- Mencionar que `alpha=1.0` colapsa al modo Booleano y `alpha=0.0` al modo Semántico.
+
+### 4:00 - 5:30 — RAG con citas y streaming
+
+- Cambiar al tab **Preguntar**.
+- Pregunta: `¿Qué ciudades históricas españolas debería visitar para entender la herencia romana y árabe?`
+- Mientras la respuesta hace streaming, explicar que:
+  - El recuperador en modo híbrido obtiene los 5 destinos más relevantes.
+  - El prompt instruye al LLM a usar **solo** ese contexto.
+  - Las fuentes [1], [2], [3]... aparecen en línea y se expanden al final con la descripción completa del destino.
+- Si configuró Tavily, hacer una pregunta fuera del corpus (`hoteles boutique en Tofino 2026`) para demostrar el badge `[Búsqueda web]`.
+
+### 5:30 - 7:00 — Recomendación con perfiles sintéticos
+
+- Cambiar el perfil en la sidebar a **mochilero**.
+- Tab **Recomendado para ti** → Cargar recomendaciones.
+- Mostrar la persona ancla (`synthetic:mochilero`) y los destinos sugeridos.
+- Cambiar perfil a **lujo**, recargar. Mostrar destinos totalmente distintos.
+- Explicar la estrategia híbrida (content-based + pseudo-colaborativo) en una frase: "embedding del perfil + snap a la persona más cercana, promediados con `alpha=0.6`".
+- Referenciar [docs/11_recomendacion.md](11_recomendacion.md) para el detalle algorítmico.
+
+### 7:00 - 8:00 — Posicionamiento avanzado: secciones y mapa
+
+- Volver al tab **Buscar destinos** con la query `ciudades históricas`.
+- Activar **Agrupar por estrategia de posicionamiento**.
+- Mostrar las cuatro secciones: Más relevantes (orden original), Populares (Turín al frente por popularity=0.696), Recientes (idéntico porque toda la ingesta fue el mismo día), Variados (un país por slot).
+- Activar **Mostrar mapa interactivo**.
+- Mostrar el mapa Folium con marcadores y popups; hacer click en uno para mostrar el detalle.
+- Mencionar que 21 de cada 30 destinos del corpus tienen coordenadas (cobertura 70%).
+
+### 8:00 - 9:00 — Evaluación cuantitativa
+
+- Cerrar la UI, abrir terminal.
+- Mostrar `python -m src.cli evaluate --modes boolean --top-k 10`.
+- Apuntar a los números (P@10=0.11, R@10=0.27, MAP=0.22, MRR=0.36, nDCG@10=0.29).
+- Abrir `docs/figures/metrics_by_mode.png` y los dos heatmaps. Explicar:
+  - Bar chart: comparación agregada entre modos (cuando Qdrant esté materializado, mostrará los tres).
+  - Heatmap P@k: dónde el modo brilla y dónde falla, query por query.
+- Mostrar el contenido de `data/eval/queries.json` y explicar la metodología de anotación por reglas objetivas (T105).
+
+### 9:00 - 10:00 — Decisiones, limitaciones y cierre
+
+- Abrir [docs/17_critica_y_deficiencias.md](17_critica_y_deficiencias.md).
+- Mencionar las tres limitaciones más relevantes:
+  1. Corpus mono-fuente (Wikivoyage en inglés, 206 destinos).
+  2. Imágenes no descargadas (multimodal funcional pero sin contenido real).
+  3. SQLite drift que la UI maneja con degradación elegante.
+- Resaltar las tres bondades técnicas:
+  1. Modelo Booleano Extendido con `p` continuo y validado empíricamente.
+  2. Separación de responsabilidades + 500+ tests pytest sin servicios externos.
+  3. Manejo unificado de errores (T110) con 503 explícito cuando Qdrant cae.
+- Cerrar con propuestas de mejora a corto plazo (sección 4 del capítulo 17).
+
+### Si algo falla en vivo
+
+| Problema | Plan B |
+|---|---|
+| Qdrant no levanta | Usar solo el modo Booleano. La evaluación funciona, las secciones de posicionamiento también. |
+| Gemini cae o no hay internet | Configurar `LLM_PROVIDER=ollama` previamente. El RAG funciona local. |
+| Streamlit no responde | Demo por API con curl + `docs/12_interfaz.md` y `docs/figures/*.png`. |
+| La pregunta del jurado es sobre un tema no implementado | Apoyarse en [docs/17_critica_y_deficiencias.md](17_critica_y_deficiencias.md) sección "Limitaciones que no son resolvibles dentro del alcance". |
+
+### Cierre
+
+```
+"El sistema implementa los nueve módulos del plan más una capa de
+posicionamiento, una de evaluación con cinco métricas estándar y
+documentación versionada con bibliografía. La crítica y las
+limitaciones están escritas con honestidad en el capítulo 17. Estamos
+listos para preguntas."
+```
