@@ -149,6 +149,60 @@ con $\alpha \in [0, 1]$. Si una rama no devuelve $d$, su contribución es 0 (no 
 - **Ramas independientes**: no se comparte estado entre ambas (la rama colaborativa hace su propio snapping). Esto evita acoplamientos sutiles y permite cachear los embeddings de personas dentro de la rama colaborativa sin afectar al content-based.
 - **Sin renormalización post-fusion**: los scores entrantes ya están en $[0, 1]$ (coseno), por lo que el resultado fundido permanece en el mismo rango. Esto permite tratar el score como una "similitud" consistente con los modos de búsqueda.
 
+---
+
+## T096 — Endpoint `POST /recommend`
+
+`src/api/main.py` expone el endpoint que la UI consume y `src/recommendation/service.py` concentra la lógica de aplicación (`RecommendationService`).
+
+### Contrato
+
+Request body (`RecommendRequest`):
+
+| Campo | Tipo | Default | Notas |
+|---|---|---|---|
+| `user_id` | `str?` | `null` | Id sintético (`synthetic:lujo`, `lujo`) o id estable propio. |
+| `interests` | `list[str]` | `[]` | Tags libres declarados por el usuario. |
+| `history` | `list[str]` | `[]` | Ids de destinos con los que el usuario interactuó. |
+| `top_k` | `int` | 10 | Rango `[1, 50]`. |
+| `mode` | `str` | `hybrid` | `content`, `collaborative` o `hybrid`. |
+| `alpha` | `float` | 0.6 | Peso del content-based en modo `hybrid`. Rango `[0, 1]`. |
+
+Response (`RecommendResponse`):
+
+```json
+{
+  "results": [
+    {
+      "id": "santorini-gr",
+      "score": 0.92,
+      "name": "Santorini",
+      "country": "Grecia",
+      "description": "Isla mediterránea con casas blancas.",
+      "image_urls": ["https://example.com/santorini.jpg"]
+    }
+  ],
+  "persona": "synthetic:lujo",
+  "empty": false
+}
+```
+
+### Resolución del perfil
+
+`build_request_profile(user_id, interests, history)` resuelve el `UserProfile` aplicando estas reglas:
+
+1. Si `user_id` mapea a un perfil sintético (con o sin prefijo `synthetic:`), se parte de una copia profunda de ese perfil.
+2. Los intereses y el historial extra del request se anexan sin eliminar lo que el perfil sintético ya declara (deduplicando preservando orden).
+3. Si no hay perfil sintético, se crea un `UserProfile(id=user_id or "anonymous")` con la señal proporcionada.
+4. Si las tres fuentes son vacías, se devuelve `None` y el endpoint responde `empty=True` con `results=[]`.
+
+### Decisiones de diseño
+
+- **`RecommendationService` aislado del transporte**: la lógica de elección de estrategia y composición de la respuesta vive fuera de FastAPI. Permite probarla sin levantar TestClient y reutilizarla desde un CLI futuro.
+- **`persona` en la respuesta**: la UI muestra qué persona se usó como ancla. Sirve de explicación (T097 lo usa en el onboarding) y como mecanismo de depuración cuando un resultado no encaja con el perfil.
+- **Score clampado a `[0, 1]`**: aunque la fusion mantiene los scores en ese rango por construcción, el endpoint hace `clamp` defensivo antes de armar el `DestinationResult` para tolerar futuras ramas con escalas distintas (por ejemplo, popularidad de T099).
+
+
 
 
 

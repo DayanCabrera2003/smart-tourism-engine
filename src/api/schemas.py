@@ -185,6 +185,75 @@ class MultimodalSearchRequest(BaseModel):
     )
 
 
+RECOMMENDATION_MODES = ("content", "collaborative", "hybrid")
+
+
+class RecommendRequest(BaseModel):
+    """Cuerpo del ``POST /recommend`` (T096).
+
+    Permite tres formas de identificar el perfil sin acoplarnos a una
+    base de datos de usuarios:
+
+    - ``user_id``: id sintético (por ejemplo ``synthetic:mochilero``) que
+      el backend resuelve contra el catálogo de T092.
+    - ``interests``: lista de intereses libres declarados por el cliente
+      (la UI lo usa cuando el usuario configura manualmente sus tags).
+    - ``history``: ids de destinos con los que el usuario interactuó.
+
+    Las tres formas se pueden combinar: el endpoint resuelve el perfil
+    sintético primero y luego le agrega los intereses e historial extra.
+    Si ninguna fuente aporta señal el endpoint devuelve una respuesta
+    vacía marcada con ``empty=True``.
+    """
+
+    user_id: str | None = Field(
+        None,
+        description="Id sintético (synthetic:<persona>) o id estable del usuario.",
+    )
+    interests: list[str] = Field(
+        default_factory=list,
+        description="Intereses declarados por el usuario.",
+    )
+    history: list[str] = Field(
+        default_factory=list,
+        description="Ids de destinos con los que el usuario interactuó.",
+    )
+    top_k: int = Field(
+        10,
+        ge=1,
+        le=50,
+        description="Número máximo de destinos a devolver.",
+    )
+    mode: str = Field(
+        "hybrid",
+        pattern="^(content|collaborative|hybrid)$",
+        description="Estrategia de recomendación: content, collaborative o hybrid.",
+    )
+    alpha: float = Field(
+        0.6,
+        ge=0.0,
+        le=1.0,
+        description="Peso del content-based en modo hybrid.",
+    )
+
+
+class RecommendResponse(BaseModel):
+    """Respuesta del ``POST /recommend`` con los destinos recomendados (T096)."""
+
+    results: list[DestinationResult] = Field(
+        default_factory=list,
+        description="Destinos rankeados de mayor a menor score.",
+    )
+    persona: str | None = Field(
+        None,
+        description="Id del perfil sintético usado como ancla (synthetic:<persona>).",
+    )
+    empty: bool = Field(
+        False,
+        description="True si el perfil no aportó señal suficiente para recomendar.",
+    )
+
+
 class AskRequest(BaseModel):
     """Cuerpo del ``POST /ask`` y ``POST /ask/stream``."""
 

@@ -45,6 +45,8 @@ from src.api.schemas import (
     ImageSearchResponse,
     ImageSearchResult,
     MultimodalSearchRequest,
+    RecommendRequest,
+    RecommendResponse,
     SearchRequest,
     SearchResponse,
     SemanticSearchRequest,
@@ -206,6 +208,23 @@ def get_image_collection() -> str:
     from src.multimodal.image_indexer import IMAGE_COLLECTION
 
     return IMAGE_COLLECTION
+
+
+@lru_cache(maxsize=1)
+def _default_recommendation_service():
+    """Build the singleton RecommendationService used by ``/recommend`` (T096)."""
+    from src.recommendation.service import RecommendationService
+
+    return RecommendationService(
+        _default_embedder(),
+        _default_vector_store(),
+        collection=DEFAULT_COLLECTION,
+    )
+
+
+def get_recommendation_service():
+    """Provee el RecommendationService. Inyectable en tests."""
+    return _default_recommendation_service()
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -484,6 +503,53 @@ def ask(request: AskRequest, pipeline: RagPipelineDep) -> AskResponse:
         top_k=request.top_k,
         mode=request.mode,
         alpha=request.alpha,
+    )
+
+
+RecommendationServiceDep = Annotated[object, Depends(get_recommendation_service)]
+
+
+@app.post("/recommend", response_model=RecommendResponse)
+def recommend(
+    request: RecommendRequest,
+    service: RecommendationServiceDep,
+    destinations: DestinationsDep,
+) -> RecommendResponse:
+    """Recomienda destinos según el perfil del usuario (T096).
+
+    Resuelve el perfil con :func:`build_request_profile` (combina
+    perfiles sintéticos, intereses libres e historial) y dispara la
+    estrategia seleccionada (`content`, `collaborative` o `hybrid`).
+    """
+    from src.recommendation.service import build_request_profile
+
+    profile = build_request_profile(
+        request.user_id,
+        request.interests,
+        request.history,
+    )
+    outcome = service.recommend(
+        profile,
+        top_k=request.top_k,
+        mode=request.mode,
+        alpha=request.alpha,
+    )
+    results: list[DestinationResult] = []
+    for doc_id, score, payload in outcome.hits:
+        meta = destinations.get(doc_id) or {}
+        clamped = max(0.0, min(1.0, float(score)))
+        results.append(
+            DestinationResult(
+                id=doc_id,
+                score=clamped,
+                name=payload.get("name") or meta.get("name"),
+                country=payload.get("country") or meta.get("country"),
+                description=meta.get("description"),
+                image_urls=list(payload.get("image_urls") or meta.get("image_urls") or []),
+            )
+        )
+    return RecommendResponse(
+        results=results, persona=outcome.persona, empty=outcome.empty
     )
 
 
