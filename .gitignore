@@ -34,7 +34,8 @@ ENV/
 data/raw/*
 !data/raw/.gitkeep
 data/processed/
-data/eval/
+data/eval/*
+!data/eval/queries.json
 
 # IDEs
 .vscode/
@@ -49,6 +50,5 @@ docs/*.pdf
 # AI/Project Planning (User requested)
 GEMINI.md
 plan_proyecto_sri_turismo.md
-data
 /.github/instructions/instructions.instructions.md
 docs/superpowers/
