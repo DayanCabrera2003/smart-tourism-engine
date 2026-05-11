@@ -98,4 +98,27 @@ Ambos vectores están L2-normalizados por construcción (`build_profile_embeddin
 - **Fallback explícito**: la ausencia de señal no se reemplaza dentro del recomendador; la capa superior decide qué mostrar (perfiles populares, último indexado, etc.). Mantener el recomendador puro facilita probarlo en aislamiento.
 - **Filtro de historial transparente**: el filtrado ocurre tras la búsqueda usando los ids del payload, lo que evita imponer filtros server-side que limiten la flexibilidad de Qdrant si el corpus crece.
 
+---
+
+## T094 — Recomendador pseudo-colaborativo
+
+`src/recommendation/collaborative.py` define `CollaborativeRecommender`, que aproxima el filtrado colaborativo cuando todavía no hay suficientes interacciones reales para entrenarlo.
+
+### Algoritmo
+
+1. **Snapping a persona**: embebe el perfil del usuario y los seis perfiles sintéticos (T092) con el mismo `TextEmbedder` y elige la persona cuya similitud coseno con el usuario es máxima.
+2. **Reuso del content-based**: usa el `ContentBasedRecommender` (T093) con la **copia** de esa persona para producir el ranking final. La copia hereda el historial del usuario, de modo que un destino que el usuario ya visitó queda excluido aunque "los demás de esa persona" lo habrían recomendado.
+3. **Fallback**: si el perfil no produce embedding (sin intereses ni historial), devuelve `[]` para no fabricar señal.
+
+### Cache de embeddings de personas
+
+Los seis personas son fijos durante el ciclo de vida del proceso, por lo que sus embeddings se computan una vez y se cachean en la instancia (`_persona_embeddings`). Cada request paga una sola búsqueda en Qdrant: la del content-based final, no seis adicionales para re-embeber las personas.
+
+### Justificación del enfoque "frío"
+
+- **Sin matriz de interacciones**: el proyecto no recolecta ratings ni clicks de cohortes de usuarios. Un colaborativo clásico (KNN sobre usuarios o factorización matricial) requeriría datos que aún no existen.
+- **Perfiles sintéticos como sustitutos de cohortes**: cada persona representa un cluster ideal del catálogo, así que recomendar "lo que la persona X consumiría" se comporta como un colaborativo entre usuarios alineados a esa persona.
+- **Convergencia con el content-based al solapar señal**: cuando el usuario declara muchos intereses, su embedding se acerca a más de una persona; el recomendador resuelve el empate por coseno máximo, evitando volver al content-based puro.
+
+
 
