@@ -39,6 +39,9 @@ dev = [
     "isort",
     "pre-commit",
 ]
+load-tests = [
+    "locust",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
