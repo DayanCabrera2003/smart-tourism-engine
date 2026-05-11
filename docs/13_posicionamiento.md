@@ -46,3 +46,39 @@ Con los 206 destinos de Wikivoyage, la distribución resultante encaja con la in
 - **Nombres < 3 caracteres se ignoran**: regexes de palabras cortas matchean falsamente (p. ej. "Vi" matchearía "via", "Vienna"). Filtrarlos evita inflación artificial.
 - **Sin auto-menciones**: un destino no cuenta sus propias menciones; eso premiaría la verbosidad y no la popularidad real.
 - **Min-max independiente**: normalizar cada señal por separado antes de combinar evita que un destino con descripción muy larga ahogue la señal de menciones.
+
+---
+
+## T100 — Score de frescura
+
+`src/retrieval/freshness.py` calcula la frescura de un destino a partir de `fetched_at` con decay exponencial.
+
+### Fórmula
+
+$$
+\mathrm{freshness}(t) = 2^{-\frac{\mathrm{age\_dias}(t)}{\mathrm{half\_life}}}
+$$
+
+donde `age_dias = max(0, (now - fetched_at) / 86400)` y `half_life = 180 días` por defecto. El comportamiento de la curva:
+
+| Edad | Score |
+|---|---|
+| Recién ingresado | 1.00 |
+| 90 días | ≈ 0.71 |
+| 180 días (1 half-life) | 0.50 |
+| 360 días (2 half-lives) | 0.25 |
+| 720 días | ≈ 0.06 |
+
+### Por qué decay exponencial
+
+- **Suave y monótono**: pequeñas diferencias de edad producen pequeños cambios de score; no hay saltos discretos que el usuario perciba como arbitrarios.
+- **Sin recorte abrupto**: un destino de hace 200 días no se descarta, solo pierde peso frente a uno de hace 30. Eso preserva cobertura del catálogo sin disfrazar contenido viejo de fresco.
+- **Half-life como hiperparámetro**: ajustable según la cadencia real de revisión humana del corpus. 180 días refleja una revisión cuatrimestral típica de contenido turístico.
+
+### Decisiones de diseño
+
+- **No persistir el score**: cambia con cada minuto. El timestamp persistido + cálculo barato evita escrituras innecesarias.
+- **Naive datetimes asumidos UTC**: la ingesta usa `datetime.now(timezone.utc)` pero los JSONL pueden traer cadenas sin tz; tratarlas como UTC mantiene la coherencia.
+- **`fetched_at = None` → score 0**: si no podemos fechar el dato, no lo confiamos. Es estricto pero defensivo.
+- **Timestamps futuros clampeados a `now`**: clock skew o data tampering no debe inflar el score por encima de 1.0.
+
