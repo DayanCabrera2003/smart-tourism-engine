@@ -99,9 +99,22 @@ El script:
 4. Inyecta metadatos (título, autor, fecha) y genera tabla de contenidos numerada hasta nivel 2.
 5. Aplica papel A4, márgenes 2.5 cm, fuente DejaVu Sans 11pt.
 
-### Estado en esta entrega
+### Fuentes (opcional)
 
-En el entorno donde se preparó la entrega `pandoc` no estaba instalado. El script está versionado y listo para correr en cuanto se instale la herramienta. La ejecución sin pandoc devuelve un error explícito con las instrucciones, en lugar de fallar silenciosamente.
+Por defecto el script usa la familia **Latin Modern** que viene con `texlive-collection-fontsrecommended`, por lo que funciona sin instalar nada extra. Para una tipografía más amplia con cobertura Unicode completa (recomendado para evitar warnings con caracteres `∈ ≈ α` y los box-drawing `─ ┘`):
+
+```bash
+sudo dnf install -y dejavu-sans-fonts dejavu-sans-mono-fonts dejavu-serif-fonts
+
+# Y al correr el script:
+MAINFONT="DejaVu Sans" MONOFONT="DejaVu Sans Mono" ./scripts/build_pdf.sh
+```
+
+Las variables `MAINFONT` y `MONOFONT` se honran solo si están seteadas, así que `./scripts/build_pdf.sh` solo (sin variables) usa Latin Modern.
+
+### Estado verificado
+
+Probado en Fedora 43 con `pandoc 3.6.4`, `xelatex` de `texlive-xetex svn66203-95.fc43.1`. Resultado: `docs/informe_final.pdf` de 86 páginas, 354 KB, incluye tabla de contenidos numerada hasta nivel 2 y los 18 capítulos en el orden del índice.
 | `LOG_LEVEL` | Nivel de verbosidad de los logs del sistema. | `INFO` |
 | `DATA_DIR` | Ruta base para el almacenamiento de datos. | `data` |
 

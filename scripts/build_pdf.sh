@@ -70,6 +70,18 @@ done
 
 mkdir -p "$(dirname "$OUTPUT")"
 
+# Optional font overrides. By default we let xelatex use its built-in
+# Latin Modern family so the script works on a minimal texlive install.
+# Set MAINFONT / MONOFONT in the environment to override (e.g. once
+# DejaVu fonts are installed system-wide).
+FONT_ARGS=()
+if [[ -n "${MAINFONT:-}" ]]; then
+    FONT_ARGS+=(--variable "mainfont=$MAINFONT")
+fi
+if [[ -n "${MONOFONT:-}" ]]; then
+    FONT_ARGS+=(--variable "monofont=$MONOFONT")
+fi
+
 echo "Building $OUTPUT with $ENGINE..."
 pandoc \
     --from=markdown \
@@ -85,8 +97,7 @@ pandoc \
     --variable papersize=a4 \
     --variable geometry:margin=2.5cm \
     --variable fontsize=11pt \
-    --variable mainfont="DejaVu Sans" \
-    --variable monofont="DejaVu Sans Mono" \
+    "${FONT_ARGS[@]}" \
     --output="$OUTPUT" \
     "${CHAPTERS[@]}"
 
