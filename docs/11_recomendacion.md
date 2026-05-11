@@ -69,3 +69,33 @@ Si no hay señal (sin intereses y sin historial cubierto por `history_embeddings
 - **Intereses en español**: la UI los muestra tal cual, y el embedder `all-MiniLM-L6-v2` es multilingüe, por lo que no se pierde calidad al embeber tags en español contra descripciones de destinos en cualquier idioma del catálogo.
 - **Namespace `synthetic:`**: distingue los perfiles preset de los perfiles reales en `user_id`, evitando colisiones si en el futuro se persisten usuarios reales.
 
+---
+
+## T093 — Recomendador content-based
+
+`src/recommendation/content_based.py` define `ContentBasedRecommender`, que rankea destinos por similitud coseno entre el embedding del perfil y los vectores indexados en Qdrant.
+
+### Algoritmo
+
+1. Recibe un `UserProfile` y materializa su embedding con `build_profile_embedding` (puede usar `history_embeddings` opcional para integrar historial real).
+2. Si el perfil no tiene señal (sin intereses ni historial cubierto), devuelve `[]` para que la capa de aplicación caiga en un fallback en lugar de inventar resultados.
+3. Consulta `VectorStore.search(collection, query_vector, top_k=fetch_k)` sobre la colección `destinations_text` (la misma que usan T053 y T055). Se sobre-pesca (`fetch_k = max(2*top_k, top_k + |excluded|)`) para garantizar `top_k` resultados tras filtrar.
+4. Filtra ids presentes en `profile.history` ∪ `exclude` (parámetro opcional del recomendador) y devuelve hasta `top_k` resultados con `(destination_id, score, payload)`.
+
+### Fórmula
+
+Para un perfil con embedding $u$ y un destino con embedding $d_i$:
+
+$$
+\mathrm{score}(u, d_i) = \frac{u \cdot d_i}{\|u\| \cdot \|d_i\|}
+$$
+
+Ambos vectores están L2-normalizados por construcción (`build_profile_embedding` y `TextEmbedder` lo garantizan), por lo que el producto punto que devuelve Qdrant ya es el coseno.
+
+### Decisiones de diseño
+
+- **Reusar la colección semántica**: en lugar de duplicar embeddings en una colección dedicada a recomendación, el módulo consulta `destinations_text`. Esto evita inconsistencias entre los dos índices y comparte la inversión de T052/T060.
+- **Fallback explícito**: la ausencia de señal no se reemplaza dentro del recomendador; la capa superior decide qué mostrar (perfiles populares, último indexado, etc.). Mantener el recomendador puro facilita probarlo en aislamiento.
+- **Filtro de historial transparente**: el filtrado ocurre tras la búsqueda usando los ids del payload, lo que evita imponer filtros server-side que limiten la flexibilidad de Qdrant si el corpus crece.
+
+
