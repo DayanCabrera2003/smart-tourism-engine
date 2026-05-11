@@ -97,3 +97,50 @@ El campo `review_status: "pending_human_validation"` señala que las anotaciones
 - **k inválido → excepción**: `k <= 0` o no-entero hacen fallar la llamada inmediatamente. Mejor un error claro que un cálculo silenciosamente roto.
 
 
+
+---
+
+## T107 — MAP, MRR y nDCG
+
+### Average Precision y MAP
+
+$$
+\mathrm{AP} = \frac{1}{|\text{relevantes}|} \sum_{k \in \text{ranks de hits}} \mathrm{Precision@}k
+$$
+
+Y `MAP = mean(AP_q)` para `q` en el set de evaluación. **AP penaliza relevantes no recuperados**: si tienes dos relevantes y solo encuentras uno, AP queda acotado por 0.5 incluso si el hit está en el rango 1.
+
+### Reciprocal Rank y MRR
+
+$$
+\mathrm{RR} = \frac{1}{\text{rango del primer hit}}, \quad \mathrm{MRR} = \frac{1}{Q} \sum_{q=1}^{Q} \mathrm{RR}_q
+$$
+
+Útil cuando importa "¿qué tan rápido aparece la primera respuesta correcta?" más que el ranking completo. Por construcción RR cae a 0 cuando ningún relevante está en la lista.
+
+### DCG y nDCG
+
+$$
+\mathrm{DCG@}k = \sum_{i=1}^{k} \frac{\mathrm{gain}(i)}{\log_2(i+1)}
+$$
+
+$$
+\mathrm{nDCG@}k = \frac{\mathrm{DCG@}k}{\mathrm{iDCG@}k}
+$$
+
+Donde iDCG@k es el DCG del ranking ideal (todos los relevantes lo antes posible). Soporta dos modos:
+
+- **Binario** (default): gain en {0, 1} según si el documento está en `relevant` o no. Es lo que usa nuestra evaluación porque las anotaciones son binarias.
+- **Graded** (`binary=False`): si pasas `relevant` como dict `id -> score`, la métrica usa los scores graduados. Lo dejamos disponible para futuras anotaciones con escala 0-3 al estilo TREC.
+
+### Por qué tantas métricas
+
+Ninguna métrica sola dice si un recuperador funciona:
+
+- **Precision@k** mide la calidad del top visible para el usuario.
+- **Recall@k** mide si encontramos todo lo importante.
+- **MAP** combina precisión con cobertura sobre todos los relevantes.
+- **MRR** premia tener el primer hit arriba (útil en "feeling lucky").
+- **nDCG** discounta hits que llegan tarde (un relevante en el rango 1 vale más que uno en el rango 10).
+
+Reportar las cinco juntas hace explícitos los trade-offs de cada modo del recuperador (Booleano vs semántico vs híbrido).
