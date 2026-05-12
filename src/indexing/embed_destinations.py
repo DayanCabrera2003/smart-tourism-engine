@@ -25,6 +25,31 @@ def slug_to_uuid(slug: str) -> str:
     return str(uuid.uuid5(_NAMESPACE, slug))
 
 
+def _build_embedding_text(doc: dict[str, Any]) -> str:
+    """Compose the text we feed to the embedder for a destination.
+
+    Includes the country (and region when available) so the dense
+    retriever can match geographic intents like "playas en cuba" even
+    when the body description does not mention the country literally.
+    Order matters: name first so the title carries the highest
+    weight in BERT-style tokenization, then geo, then body.
+    """
+    parts: list[str] = []
+    name = (doc.get("name") or "").strip()
+    if name:
+        parts.append(name)
+    country = (doc.get("country") or "").strip()
+    if country:
+        parts.append(country)
+    region = (doc.get("region") or "").strip()
+    if region:
+        parts.append(region)
+    description = (doc.get("description") or "").strip()
+    if description:
+        parts.append(description)
+    return ". ".join(parts)
+
+
 def _build_point(doc: dict[str, Any], vector: list[float]) -> VectorPoint:
     slug = doc["id"]
     payload: dict[str, Any] = {"slug": slug}
@@ -84,7 +109,7 @@ def embed_destinations(
             point_id = slug_to_uuid(doc["id"])
             if only_new and point_id in existing_ids:
                 continue
-            text = f"{doc.get('name', '')}. {doc.get('description', '')}".strip()
+            text = _build_embedding_text(doc)
             vector = embedder.embed(text)
             batch.append(_build_point(doc, vector))
             if len(batch) >= batch_size:

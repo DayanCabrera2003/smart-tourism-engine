@@ -102,14 +102,27 @@ def test_embed_destinations_payload_and_id(jsonl_file: Path) -> None:
     assert payload["source"] == "wikivoyage"
 
 
-def test_embed_destinations_embeds_name_plus_description(jsonl_file: Path) -> None:
+def test_embed_destinations_embeds_name_country_region_description(
+    jsonl_file: Path,
+) -> None:
+    """The embedded text includes country and region so dense retrieval
+    can resolve geographic intents like 'playas en cuba' even when the
+    description body does not mention the country literally."""
     store = _fresh_store()
     embedder = _StubEmbedder()
 
     embed_destinations(jsonl_file, store, embedder)
 
-    assert "Madrid. Capital de España, conocida por sus museos." in embedder.calls
-    assert "Toledo. Ciudad medieval con catedral gótica." in embedder.calls
+    assert (
+        "Madrid. España. Comunidad de Madrid. "
+        "Capital de España, conocida por sus museos."
+        in embedder.calls
+    )
+    assert (
+        "Toledo. España. Castilla-La Mancha. "
+        "Ciudad medieval con catedral gótica."
+        in embedder.calls
+    )
 
 
 def test_embed_destinations_batches(tmp_path: Path) -> None:

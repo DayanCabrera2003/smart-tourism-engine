@@ -59,6 +59,10 @@ from src.indexing.embedder import TextEmbedder
 from src.indexing.inverted_index import InvertedIndex
 from src.indexing.vector_store import VectorStore
 from src.retrieval.extended_boolean import ExtendedBoolean
+from src.retrieval.geo_filter import (
+    apply_country_filter,
+    filter_search_hits,
+)
 from src.retrieval.hybrid import HybridRetriever
 
 app = FastAPI(
@@ -298,10 +302,20 @@ def search(
 ) -> SearchResponse:
     """Busca destinos con el Booleano Extendido (p-norm) y los devuelve rankeados."""
     retriever = retriever_factory(request.p)
-    hits = retriever.search(request.query, index, top_k=request.top_k)
+    # Over-fetch so the geo filter can remove off-country hits and
+    # still satisfy the requested top_k.
+    fetch_k = max(request.top_k * 3, 30)
+    hits = retriever.search(request.query, index, top_k=fetch_k)
+    hits_with_country = [
+        (doc_id, score, (destinations.get(doc_id) or {}).get("country"))
+        for doc_id, score in hits
+    ]
+    filtered = apply_country_filter(
+        hits_with_country, request.query, country_getter=lambda h: h[2]
+    )
     results = [
         _build_destination_result(doc_id, score, destinations)
-        for doc_id, score in hits
+        for doc_id, score, _ in filtered[: request.top_k]
     ]
     return SearchResponse(results=results)
 
@@ -319,16 +333,26 @@ def search_semantic(
     collection: SemanticCollectionDep,
     destinations: DestinationsDep,
 ) -> SearchResponse:
-    """Búsqueda semántica (T053): embebe la query y consulta Qdrant directamente."""
+    """Búsqueda semántica (T053): embebe la query y consulta Qdrant directamente.
+
+    T127: cuando la query menciona un país conocido del corpus
+    ('playas en cuba'), filtra post-recuperación a destinos de ese país
+    para evitar que un embedding con descripción rica de otro país
+    domine el ranking.
+    """
+    # Over-fetch so the geo filter has material to keep top_k even
+    # after removing off-country hits.
+    fetch_k = max(request.top_k * 3, 30)
     try:
         query_vector = embedder.embed(request.query)
-        hits = store.search(collection, query_vector, top_k=request.top_k)
+        raw_hits = store.search(collection, query_vector, top_k=fetch_k)
     except Exception as exc:  # pragma: no cover - delegado a middleware
         raise HTTPException(
             status_code=503,
             detail=f"Búsqueda semántica no disponible: {exc}",
         ) from exc
 
+    filtered = filter_search_hits(raw_hits, request.query)
     results = [
         _build_destination_result(
             str(payload.get("slug") or point_id),
@@ -336,7 +360,7 @@ def search_semantic(
             destinations,
             payload=payload,
         )
-        for point_id, score, payload in hits
+        for point_id, score, payload in filtered[: request.top_k]
     ]
     return SearchResponse(results=results)
 
@@ -351,7 +375,11 @@ def search_hybrid(
     retriever_factory: RetrieverFactoryDep,
     destinations: DestinationsDep,
 ) -> SearchResponse:
-    """Búsqueda híbrida (T055): Booleano Extendido + semántico con peso alpha."""
+    """Búsqueda híbrida (T055): Booleano Extendido + semántico con peso alpha.
+
+    T127: aplica el geo filter post-merge para descartar destinos
+    cuyo país no coincida con la query.
+    """
     extended = retriever_factory(request.p)
     hybrid = HybridRetriever(
         extended=extended,
@@ -360,10 +388,18 @@ def search_hybrid(
         collection=collection,
         alpha=request.alpha,
     )
-    hits = hybrid.search(request.query, index, top_k=request.top_k)
+    fetch_k = max(request.top_k * 3, 30)
+    hits = hybrid.search(request.query, index, top_k=fetch_k)
+    hits_with_country = [
+        (doc_id, score, (destinations.get(doc_id) or {}).get("country"))
+        for doc_id, score in hits
+    ]
+    filtered = apply_country_filter(
+        hits_with_country, request.query, country_getter=lambda h: h[2]
+    )
     results = [
         _build_destination_result(doc_id, score, destinations)
-        for doc_id, score in hits
+        for doc_id, score, _ in filtered[: request.top_k]
     ]
     return SearchResponse(results=results)
 
