@@ -128,3 +128,66 @@ def test_filter_search_hits_no_country_query_passes_through() -> None:
     ]
     out = filter_search_hits(raw, "ciudades historicas")
     assert out == raw
+
+
+# ─── Region aliases (T127.2) ─────────────────────────────────────────
+
+
+def test_detect_countries_caribbean_alias_returns_caribbean_countries() -> None:
+    countries = detect_countries("playas en el caribe")
+    assert "Cuba" in countries
+    assert "Dominican Republic" in countries
+    assert "Puerto Rico" in countries
+    assert "Spain" not in countries
+
+
+def test_detect_countries_caribbean_english_alias() -> None:
+    countries = detect_countries("beaches in the caribbean")
+    assert {"Cuba", "Dominican Republic", "Puerto Rico"}.issubset(countries)
+
+
+def test_detect_countries_mediterranean_alias() -> None:
+    countries = detect_countries("ciudades del mediterraneo")
+    assert "Spain" in countries
+    assert "Italy" in countries
+    assert "Greece" in countries
+
+
+def test_detect_countries_asia_alias() -> None:
+    countries = detect_countries("destinos en asia")
+    assert "Japan" in countries
+    assert "Thailand" in countries
+    assert "Spain" not in countries
+
+
+def test_detect_countries_europe_alias() -> None:
+    countries = detect_countries("travel through europa")
+    assert "Spain" in countries
+    assert "France" in countries
+    assert "Cuba" not in countries
+
+
+def test_detect_countries_latin_america_alias() -> None:
+    countries = detect_countries("destinos en latinoamerica")
+    assert "Mexico" in countries
+    assert "Argentina" in countries
+    # The plain Caribbean countries are also part of LATAM
+    assert "Cuba" in countries
+
+
+def test_detect_countries_combines_region_and_country() -> None:
+    countries = detect_countries("playas en cuba o el caribe")
+    assert "Cuba" in countries
+    assert "Dominican Republic" in countries
+
+
+def test_detect_countries_iberia_alias() -> None:
+    countries = detect_countries("destinos en iberia")
+    assert countries == {"Spain", "Portugal"}
+
+
+def test_detect_countries_scandinavia_alias() -> None:
+    countries = detect_countries("paises nordicos para ver auroras")
+    # Detects 'paises nordicos' as Scandinavia alias
+    assert "Norway" in countries
+    assert "Sweden" in countries

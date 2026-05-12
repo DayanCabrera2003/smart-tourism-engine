@@ -61,6 +61,7 @@ from src.indexing.vector_store import VectorStore
 from src.retrieval.extended_boolean import ExtendedBoolean
 from src.retrieval.geo_filter import (
     apply_country_filter,
+    detect_countries,
     filter_search_hits,
 )
 from src.retrieval.hybrid import HybridRetriever
@@ -302,9 +303,11 @@ def search(
 ) -> SearchResponse:
     """Busca destinos con el Booleano Extendido (p-norm) y los devuelve rankeados."""
     retriever = retriever_factory(request.p)
-    # Over-fetch so the geo filter can remove off-country hits and
-    # still satisfy the requested top_k.
-    fetch_k = max(request.top_k * 3, 30)
+    # T127.2: when the query implies a location, over-fetch aggressively
+    # (up to 200) so the geo filter has enough material to find the
+    # correct destinations even when the lexical retriever ranks them
+    # far down. Otherwise the default 3x over-fetch is enough.
+    fetch_k = 200 if detect_countries(request.query) else max(request.top_k * 3, 30)
     hits = retriever.search(request.query, index, top_k=fetch_k)
     hits_with_country = [
         (doc_id, score, (destinations.get(doc_id) or {}).get("country"))
@@ -340,9 +343,12 @@ def search_semantic(
     para evitar que un embedding con descripción rica de otro país
     domine el ranking.
     """
-    # Over-fetch so the geo filter has material to keep top_k even
-    # after removing off-country hits.
-    fetch_k = max(request.top_k * 3, 30)
+    # T127.2: when the query implies a location, over-fetch
+    # aggressively (up to 200) because the dense retriever ranks short
+    # destination descriptions (e.g. Varadero) far below long ones
+    # with rich beach prose. Without a deep fetch, the geo filter has
+    # nothing matching to keep.
+    fetch_k = 200 if detect_countries(request.query) else max(request.top_k * 3, 30)
     try:
         query_vector = embedder.embed(request.query)
         raw_hits = store.search(collection, query_vector, top_k=fetch_k)
@@ -388,7 +394,8 @@ def search_hybrid(
         collection=collection,
         alpha=request.alpha,
     )
-    fetch_k = max(request.top_k * 3, 30)
+    # T127.2: same aggressive over-fetch when the query has a location.
+    fetch_k = 200 if detect_countries(request.query) else max(request.top_k * 3, 30)
     hits = hybrid.search(request.query, index, top_k=fetch_k)
     hits_with_country = [
         (doc_id, score, (destinations.get(doc_id) or {}).get("country"))

@@ -1,23 +1,28 @@
 """T127 - Geographic filter for dense retrieval.
 
-When the user writes a query that mentions a country ("playas en
-cuba", "ciudades de Francia"), the dense retriever often returns a
-foreign destination with a rich description higher than a local one
-with a short description — the embedder weighs the topical word
-("playas") more than the geographic anchor ("cuba"). The semantic
-fix is to detect the country in the query and filter post-retrieval.
+When the user writes a query that mentions a country or a region
+("playas en cuba", "ciudades de Francia", "playas en el caribe"),
+the dense retriever often returns a foreign destination with a rich
+description higher than a local one with a short description — the
+embedder weighs the topical word ("playas") more than the geographic
+anchor. The semantic fix is to detect the location in the query and
+filter post-retrieval to the matching set of countries.
 
 This module ships:
 
-- ``COUNTRY_ALIASES`` — a mapping ``corpus country -> set of common
-  aliases`` covering English and Spanish (the two languages our UI
-  exposes). Only the countries present in the current corpus need
-  entries; missing countries simply will not be detected.
-- ``detect_countries(query)`` — return the set of corpus countries the
-  query mentions.
+- ``COUNTRY_ALIASES`` — corpus country -> common aliases in English
+  and Spanish.
+- ``REGION_TO_COUNTRIES`` — region name (Caribe, Mediterraneo, Asia,
+  ...) -> set of corpus countries that fall under it.
+- ``LOCATION_ALIASES`` — flat map ``alias -> set of countries to
+  filter``. Built once at import time by combining the two tables
+  above. Only countries present in the current corpus appear; missing
+  countries simply will not be detected.
+- ``detect_countries(query)`` — return the set of corpus countries
+  implied by the query (union of all matched aliases).
 - ``apply_country_filter(hits, query)`` — keep only hits whose
   ``country`` is among the detected countries. Returns the original
-  list when no country is detected so generic queries are unaffected.
+  list when no location is detected so generic queries are unaffected.
   When the filter would leave nothing, it returns the original list
   too — better degrade gracefully than answer with an empty page.
 
@@ -32,6 +37,8 @@ from typing import Any, Iterable
 
 __all__ = [
     "COUNTRY_ALIASES",
+    "LOCATION_ALIASES",
+    "REGION_TO_COUNTRIES",
     "apply_country_filter",
     "detect_countries",
     "normalize",
@@ -124,33 +131,173 @@ COUNTRY_ALIASES: dict[str, set[str]] = {
 }
 
 
-def _alias_pattern(alias: str) -> re.Pattern[str]:
-    """Build a word-boundary regex matching the alias as a whole token."""
-    return re.compile(rf"\b{re.escape(alias)}\b", re.IGNORECASE)
-
-
-_ALIAS_PATTERNS: dict[str, list[re.Pattern[str]]] = {
-    country: [_alias_pattern(alias) for alias in aliases]
-    for country, aliases in COUNTRY_ALIASES.items()
+# Regions / continents -> set of corpus countries they cover. Only
+# countries present in COUNTRY_ALIASES are referenced; missing ones
+# would be silently ignored, but we kept the lists explicit so the
+# scope of each region is auditable.
+REGION_TO_COUNTRIES: dict[str, set[str]] = {
+    "Caribbean": {"Cuba", "Dominican Republic", "Puerto Rico"},
+    "Mediterranean": {
+        "Spain",
+        "France",
+        "Italy",
+        "Greece",
+        "Turkey",
+        "Morocco",
+        "Croatia",
+        "Egypt",
+    },
+    "Europe": {
+        "Spain",
+        "France",
+        "Italy",
+        "Germany",
+        "United Kingdom",
+        "Portugal",
+        "Netherlands",
+        "Belgium",
+        "Czech Republic",
+        "Austria",
+        "Switzerland",
+        "Hungary",
+        "Poland",
+        "Norway",
+        "Sweden",
+        "Denmark",
+        "Finland",
+        "Ireland",
+        "Iceland",
+        "Croatia",
+        "Greece",
+        "Russia",
+    },
+    "Asia": {
+        "Japan",
+        "China",
+        "Thailand",
+        "Vietnam",
+        "South Korea",
+        "Indonesia",
+        "Singapore",
+        "Malaysia",
+        "India",
+        "United Arab Emirates",
+    },
+    "Latin America": {
+        "Mexico",
+        "Brazil",
+        "Peru",
+        "Argentina",
+        "Colombia",
+        "Chile",
+        "Ecuador",
+        "Bolivia",
+        "Uruguay",
+        "Paraguay",
+        "Costa Rica",
+        "Cuba",
+        "Dominican Republic",
+        "Puerto Rico",
+    },
+    "South America": {
+        "Brazil",
+        "Peru",
+        "Argentina",
+        "Colombia",
+        "Chile",
+        "Ecuador",
+        "Bolivia",
+        "Uruguay",
+        "Paraguay",
+    },
+    "Central America": {"Costa Rica"},
+    "North America": {"United States", "Canada", "Mexico"},
+    "Africa": {"Egypt", "Morocco", "South Africa"},
+    "Oceania": {"Australia"},
+    "Iberia": {"Spain", "Portugal"},
+    "Scandinavia": {"Norway", "Sweden", "Denmark", "Finland", "Iceland"},
 }
 
 
-def detect_countries(query: str) -> set[str]:
-    """Return the corpus countries mentioned in ``query``.
+# Aliases for the regions above. Same normalization rules apply
+# (lowercase, accent-insensitive).
+_REGION_ALIASES: dict[str, set[str]] = {
+    "Caribbean": {"caribbean", "caribe", "caribena", "caribeno", "antillas"},
+    "Mediterranean": {"mediterranean", "mediterraneo", "mediterranea"},
+    "Europe": {"europe", "europa", "europeo", "europea"},
+    "Asia": {"asia", "asiatico", "asiatica"},
+    "Latin America": {
+        "latin america",
+        "latinoamerica",
+        "latinoamericano",
+        "america latina",
+    },
+    "South America": {
+        "south america",
+        "sudamerica",
+        "suramerica",
+        "america del sur",
+    },
+    "Central America": {"central america", "centroamerica", "america central"},
+    "North America": {
+        "north america",
+        "norteamerica",
+        "america del norte",
+    },
+    "Africa": {"africa", "africano", "africana"},
+    "Oceania": {"oceania"},
+    "Iberia": {"iberia", "peninsula iberica"},
+    "Scandinavia": {"scandinavia", "escandinavia", "nordic countries", "paises nordicos"},
+}
 
-    Matching is whole-word and accent-insensitive. The empty set is
-    returned when no country is detected; callers should treat that
-    as "the user did not constrain by country".
+
+def _build_location_aliases() -> dict[str, set[str]]:
+    """Flatten countries + regions into ``alias -> set of countries``."""
+    table: dict[str, set[str]] = {}
+    for country, aliases in COUNTRY_ALIASES.items():
+        for alias in aliases:
+            table.setdefault(alias, set()).add(country)
+    for region, countries in REGION_TO_COUNTRIES.items():
+        for alias in _REGION_ALIASES.get(region, set()):
+            table.setdefault(alias, set()).update(countries)
+    return table
+
+
+LOCATION_ALIASES: dict[str, set[str]] = _build_location_aliases()
+
+
+def _alias_pattern(alias: str) -> re.Pattern[str]:
+    """Build a word-boundary regex matching the alias as a whole token.
+
+    Multi-word aliases ('latin america') stay verbatim — the boundary
+    metacharacters are placed at the extremes only.
+    """
+    return re.compile(rf"\b{re.escape(alias)}\b", re.IGNORECASE)
+
+
+_ALIAS_PATTERNS: list[tuple[re.Pattern[str], set[str]]] = [
+    (_alias_pattern(alias), targets)
+    for alias, targets in LOCATION_ALIASES.items()
+]
+
+
+def detect_countries(query: str) -> set[str]:
+    """Return the corpus countries implied by ``query``.
+
+    Aliases match countries directly (``cuba`` -> {Cuba}) or regions
+    (``caribe`` -> {Cuba, Dominican Republic, Puerto Rico}). Multiple
+    aliases in the same query union their target sets. Matching is
+    whole-word and accent-insensitive. The empty set is returned when
+    no location is detected; callers should treat that as "the user
+    did not constrain geographically".
     """
     if not query or not query.strip():
         return set()
     normalized = normalize(query)
     hits: set[str] = set()
-    for country, patterns in _ALIAS_PATTERNS.items():
-        for pattern in patterns:
-            if pattern.search(normalized):
-                hits.add(country)
-                break
+    for pattern, targets in _ALIAS_PATTERNS:
+        if pattern.search(normalized):
+            hits.update(targets)
     return hits
 
 
