@@ -351,8 +351,12 @@ def search_destinations(
         endpoint = "/search"
         payload = {"query": query, "top_k": top_k, "p": p}
 
+    # The first semantic/hybrid request after API startup has to load
+    # the MiniLM model (one-time ~90 MB download + ~500 MB load), which
+    # easily exceeds a 10 s timeout. We give it 60 s; warm requests
+    # land in tens of milliseconds.
     owns_client = client is None
-    http = client or httpx.Client(base_url=api_url, timeout=10.0)
+    http = client or httpx.Client(base_url=api_url, timeout=60.0)
     try:
         response = http.post(endpoint, json=payload)
         response.raise_for_status()
