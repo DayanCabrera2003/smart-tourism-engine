@@ -39,7 +39,7 @@ from src.recommendation.synthetic_profiles import (
 )
 from src.retrieval.freshness import freshness_score
 from src.retrieval.positioning import build_positioning_sections
-from src.ui.accessibility import image_alt
+from src.ui.accessibility import image_alt, image_attribution
 from src.ui.i18n import DEFAULT_LOCALE, LOCALES, t
 from src.ui.theme import DEFAULT_THEME, THEMES, theme_css
 
@@ -665,6 +665,9 @@ def _render_image_gallery(  # pragma: no cover - Streamlit
     if len(valid_urls) == 1:
         try:
             st.image(valid_urls[0], caption=alt, use_container_width=True)
+            credit = image_attribution(valid_urls[0])
+            if credit:
+                st.caption(credit)
         except Exception:
             st.caption(alt)
         return
@@ -673,6 +676,9 @@ def _render_image_gallery(  # pragma: no cover - Streamlit
         col = cols[idx % IMAGE_GALLERY_THRESHOLD]
         try:
             col.image(url, caption=alt, use_container_width=True)
+            credit = image_attribution(url)
+            if credit:
+                col.caption(credit)
         except Exception:
             col.caption(alt)
 

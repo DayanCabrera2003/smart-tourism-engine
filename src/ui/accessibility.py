@@ -1,4 +1,4 @@
-"""T124 - Accessibility helpers for the Streamlit UI.
+"""T124, T126 - Accessibility helpers for the Streamlit UI.
 
 Two responsibilities live here:
 
@@ -7,6 +7,9 @@ Two responsibilities live here:
   inside an ``<img alt>`` attribute, so giving every image a real
   description (rather than ``"image"`` or the empty string) lets
   screen readers announce the destination instead of skipping it.
+- ``image_attribution(...)``: read the sidecar written by
+  :file:`scripts/download_images.py` and return the attribution
+  sentence to show under the image (T126: CC BY-SA credit).
 - WCAG color contrast utilities: compute the contrast ratio between
   two hex colors using the standard relative-luminance formula
   (WCAG 2.1, section 1.4.3) and a convenience ``passes_wcag_aa``
@@ -19,11 +22,15 @@ not imported. Tests cover both helpers and the palette contract.
 """
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
+from typing import Optional
 
 __all__ = [
     "WCAG_AA_NORMAL_THRESHOLD",
     "image_alt",
+    "image_attribution",
     "passes_wcag_aa",
     "wcag_contrast_ratio",
 ]
@@ -63,6 +70,52 @@ def image_alt(
     if main:
         return main
     return fallback
+
+
+# ─── Image attribution (T126) ────────────────────────────────────────────
+
+
+_SIDECAR_FILENAME = "wikipedia.json"
+
+
+def image_attribution(image_path: str) -> Optional[str]:
+    """Return the attribution sentence for an image downloaded by T126.
+
+    ``scripts/download_images.py`` writes a sidecar JSON next to each
+    image with the page URL and the license short name. This helper
+    reads that sidecar and returns the attribution string the UI can
+    show under the image.
+
+    Returns ``None`` when:
+
+    - The sidecar does not exist (e.g. the image is a remote URL,
+      not a local file).
+    - The sidecar exists but lacks an ``attribution`` field.
+    - The path is malformed.
+
+    Never raises: an unreadable sidecar is treated as missing so the
+    UI keeps rendering without the credit instead of crashing.
+    """
+    if not image_path:
+        return None
+    try:
+        path = Path(image_path)
+    except (TypeError, ValueError):
+        return None
+    if not path.is_absolute() and path.parts and path.parts[0].startswith("http"):
+        # Remote URLs cannot have a sidecar on local disk.
+        return None
+    sidecar = path.parent / _SIDECAR_FILENAME
+    if not sidecar.exists():
+        return None
+    try:
+        data = json.loads(sidecar.read_text())
+    except (OSError, ValueError):
+        return None
+    attribution = data.get("attribution")
+    if isinstance(attribution, str) and attribution.strip():
+        return attribution
+    return None
 
 
 # ─── WCAG contrast ────────────────────────────────────────────────────────

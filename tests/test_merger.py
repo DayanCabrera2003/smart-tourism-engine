@@ -36,7 +36,8 @@ def test_merge_destinations_dedup():
     madrid = next(d for d in merged if d.name.strip().lower() == "madrid")
     # Tags y urls fusionados
     assert set(madrid.tags) == {"ciudad", "capital"}
-    assert set(str(url) for url in madrid.image_urls) == {"http://img1.com/", "http://img2.com/"}
+    # T126: image_urls is list[str] now; URLs are no longer normalized by Pydantic
+    assert set(madrid.image_urls) == {"http://img1.com", "http://img2.com"}
     # Región y descripción se conservan si existen
     assert madrid.region == "Comunidad de Madrid"
     assert madrid.description == "Capital de España"

@@ -1,11 +1,14 @@
 """Tests for T124 — accessibility helpers."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from src.ui.accessibility import (
     WCAG_AA_NORMAL_THRESHOLD,
     image_alt,
+    image_attribution,
     passes_wcag_aa,
     wcag_contrast_ratio,
 )
@@ -114,3 +117,49 @@ def test_light_theme_text_on_secondary_passes_aa() -> None:
 def test_dark_theme_text_on_secondary_passes_aa() -> None:
     palette = THEMES["dark"]
     assert passes_wcag_aa(palette["text"], palette["secondary_background"])
+
+
+# ─── image_attribution (T126) ─────────────────────────────────────────────
+
+
+def test_image_attribution_returns_sidecar_value(tmp_path: Path) -> None:
+    image = tmp_path / "wikipedia.jpg"
+    image.write_bytes(b"\xff\xd8\xff")
+    sidecar = tmp_path / "wikipedia.json"
+    sidecar.write_text(
+        '{"attribution": "Imagen de Wikipedia (CC BY-SA) — https://en.wikipedia.org/wiki/Madrid"}'
+    )
+    out = image_attribution(str(image))
+    assert out and "Wikipedia" in out
+    assert "CC BY-SA" in out
+
+
+def test_image_attribution_returns_none_when_sidecar_missing(tmp_path: Path) -> None:
+    image = tmp_path / "wikipedia.jpg"
+    image.write_bytes(b"x")
+    # No sidecar written.
+    assert image_attribution(str(image)) is None
+
+
+def test_image_attribution_returns_none_for_empty_input() -> None:
+    assert image_attribution("") is None
+
+
+def test_image_attribution_returns_none_when_sidecar_unreadable(
+    tmp_path: Path,
+) -> None:
+    sidecar = tmp_path / "wikipedia.json"
+    sidecar.write_text("not valid json")
+    image = tmp_path / "wikipedia.jpg"
+    image.write_bytes(b"x")
+    assert image_attribution(str(image)) is None
+
+
+def test_image_attribution_returns_none_when_attribution_missing(
+    tmp_path: Path,
+) -> None:
+    sidecar = tmp_path / "wikipedia.json"
+    sidecar.write_text('{"title": "x"}')  # no attribution field
+    image = tmp_path / "wikipedia.jpg"
+    image.write_bytes(b"x")
+    assert image_attribution(str(image)) is None
