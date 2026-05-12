@@ -47,10 +47,12 @@ else
     BOLD=''; GREEN=''; YELLOW=''; RED=''; RESET=''
 fi
 
-log()   { echo "${BOLD}>${RESET} $*"; }
-ok()    { echo "  ${GREEN}OK${RESET} $*"; }
-warn()  { echo "  ${YELLOW}!${RESET}  $*"; }
-fail()  { echo "  ${RED}X${RESET}  $*"; }
+# Logging helpers write to stderr so command substitution in
+# functions like docker_cmd does not capture their output.
+log()   { echo "${BOLD}>${RESET} $*" >&2; }
+ok()    { echo "  ${GREEN}OK${RESET} $*" >&2; }
+warn()  { echo "  ${YELLOW}!${RESET}  $*" >&2; }
+fail()  { echo "  ${RED}X${RESET}  $*" >&2; }
 
 # ─── helpers ───────────────────────────────────────────────────────────────
 
