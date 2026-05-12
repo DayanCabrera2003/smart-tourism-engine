@@ -597,26 +597,39 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
         )
         search_clicked = st.button("Buscar", type="primary")
 
+        # T128: persist results in session_state so they survive
+        # the reruns triggered by widgets like st_folium. Without
+        # this, every map pan/zoom or toggle would clear the result
+        # list because `results` was a local-scope variable.
         if search_clicked:
             if not query.strip():
                 st.warning("Escribe una consulta antes de buscar.")
+                st.session_state.pop("search_results", None)
             else:
                 try:
                     results = search_destinations(query, mode=mode, top_k=top_k, p=p, alpha=alpha)
                 except httpx.HTTPError as exc:
                     st.error(f"Error al consultar la API ({API_URL}): {exc}")
+                    st.session_state.pop("search_results", None)
                 else:
-                    if not results:
-                        st.info("Sin resultados para esta consulta.")
-                    else:
-                        if show_map:
-                            _render_results_map(st, results)
-                        if show_sections:
-                            _render_positioning_sections(st, results)
-                        else:
-                            st.subheader(f"{len(results)} resultado(s) — modo: {mode}")
-                            for rank, hit in enumerate(results, start=1):
-                                _render_card(st, rank, hit)
+                    st.session_state["search_results"] = [r.model_dump() for r in results]
+                    st.session_state["search_mode_used"] = mode
+
+        cached = st.session_state.get("search_results")
+        if cached is not None:
+            results = [DestinationResult.model_validate(r) for r in cached]
+            if not results:
+                st.info("Sin resultados para esta consulta.")
+            else:
+                used_mode = st.session_state.get("search_mode_used", mode)
+                if show_map:
+                    _render_results_map(st, results)
+                if show_sections:
+                    _render_positioning_sections(st, results)
+                else:
+                    st.subheader(f"{len(results)} resultado(s) — modo: {used_mode}")
+                    for rank, hit in enumerate(results, start=1):
+                        _render_card(st, rank, hit)
 
     with tab_ask:
         api_mode = _SEARCH_MODE_TO_API.get(mode, "hybrid")
@@ -958,8 +971,19 @@ def _render_results_map(  # pragma: no cover - Streamlit
     st.caption(
         f"{len(geocoded)} de {len(results)} resultados tienen coordenadas."
     )
-    # streamlit-folium aun usa la API anterior, no acepta width="stretch".
-    st_folium(fmap, height=MAP_HEIGHT_PX, use_container_width=True)
+    # T128 fix: returned_objects=[] prevents st_folium from triggering
+    # a Streamlit rerun every time the user pans, zooms or clicks a
+    # marker. Without that, the entire app re-runs, search results
+    # disappear and the map flickers. A stable key keeps Streamlit
+    # from re-mounting the component on unrelated reruns.
+    # streamlit-folium still uses the legacy use_container_width API.
+    st_folium(
+        fmap,
+        height=MAP_HEIGHT_PX,
+        use_container_width=True,
+        returned_objects=[],
+        key="results_map",
+    )
 
 
 def _render_positioning_sections(  # pragma: no cover - Streamlit
