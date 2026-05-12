@@ -78,6 +78,30 @@ wait_for_http() {
     return 1
 }
 
+_DOCKER_CMD=""
+docker_cmd() {
+    # Memoize the docker invocation: 'docker' if the user is in the
+    # docker group, 'sudo docker' otherwise. Sudo will prompt for the
+    # password once; subsequent calls in the same session reuse the
+    # cached credential.
+    if [[ -n "$_DOCKER_CMD" ]]; then
+        echo "$_DOCKER_CMD"
+        return
+    fi
+    if docker info >/dev/null 2>&1; then
+        _DOCKER_CMD="docker"
+    else
+        if ! command -v sudo >/dev/null 2>&1; then
+            fail "docker pide privilegios y 'sudo' no esta instalado."
+            return 1
+        fi
+        warn "Tu usuario no esta en el grupo 'docker'. Usare 'sudo docker' (te pedira password)."
+        warn "Para evitarlo en el futuro: sudo usermod -aG docker \$USER && newgrp docker"
+        _DOCKER_CMD="sudo docker"
+    fi
+    echo "$_DOCKER_CMD"
+}
+
 ensure_qdrant() {
     if curl -sS --max-time 2 "http://localhost:${QDRANT_PORT}/collections" >/dev/null 2>&1; then
         ok "Qdrant ya esta corriendo en ${QDRANT_PORT}"
@@ -87,13 +111,15 @@ ensure_qdrant() {
         fail "Docker no esta instalado. Instalalo o levanta Qdrant a mano."
         return 1
     fi
+    local DOCKER
+    DOCKER="$(docker_cmd)" || return 1
     # Si el contenedor existe pero esta parado, arrancalo. Si no, creale.
-    if docker ps -a --format '{{.Names}}' | grep -qx "$QDRANT_CONTAINER"; then
+    if $DOCKER ps -a --format '{{.Names}}' | grep -qx "$QDRANT_CONTAINER"; then
         log "Reiniciando contenedor $QDRANT_CONTAINER"
-        docker start "$QDRANT_CONTAINER" >/dev/null
+        $DOCKER start "$QDRANT_CONTAINER" >/dev/null
     else
         log "Lanzando contenedor $QDRANT_CONTAINER"
-        docker run -d --rm \
+        $DOCKER run -d --rm \
             --name "$QDRANT_CONTAINER" \
             -p ${QDRANT_PORT}:6333 \
             -p 6334:6334 \
@@ -192,10 +218,16 @@ stop_all() {
     rm -f "$API_PID"
 
     log "Deteniendo Qdrant"
-    if docker ps --format '{{.Names}}' | grep -qx "$QDRANT_CONTAINER"; then
-        docker stop "$QDRANT_CONTAINER" >/dev/null && ok "Qdrant detenida"
+    if command -v docker >/dev/null 2>&1; then
+        local DOCKER
+        DOCKER="$(docker_cmd 2>/dev/null)" || DOCKER="docker"
+        if $DOCKER ps --format '{{.Names}}' 2>/dev/null | grep -qx "$QDRANT_CONTAINER"; then
+            $DOCKER stop "$QDRANT_CONTAINER" >/dev/null && ok "Qdrant detenida"
+        else
+            warn "Qdrant no estaba corriendo (o no es el contenedor sri-qdrant)"
+        fi
     else
-        warn "Qdrant no estaba corriendo (o no es el contenedor sri-qdrant)"
+        warn "docker no instalado; nada que detener"
     fi
 }
 
