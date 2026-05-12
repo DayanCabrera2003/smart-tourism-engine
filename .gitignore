@@ -52,3 +52,8 @@ GEMINI.md
 plan_proyecto_sri_turismo.md
 /.github/instructions/instructions.instructions.md
 docs/superpowers/
+
+# Local-only artifacts
+qdrant_storage/
+/tmp/sri-*.log
+/tmp/sri-*.pid

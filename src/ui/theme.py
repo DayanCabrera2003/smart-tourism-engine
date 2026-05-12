@@ -51,21 +51,71 @@ def theme_css(theme: str) -> str:
     - ``[data-testid="stMarkdownContainer"]`` for body text.
     - ``[data-testid="stExpander"]`` for the section expanders.
 
-    We do not chase every CSS class Streamlit emits; the goal is a
-    coherent dark surface, not a pixel-perfect rewrite.
+    The block also includes lightweight polish for result cards
+    (rounded corners, shadow, hover lift) so the default Streamlit
+    container looks less raw without writing a full component.
     """
     palette = THEMES.get(theme) or THEMES[DEFAULT_THEME]
-    return (
-        "<style>\n"
-        f".stApp {{ background-color: {palette['background']}; "
-        f"color: {palette['text']}; }}\n"
-        f"[data-testid=\"stSidebar\"] {{ "
-        f"background-color: {palette['secondary_background']}; }}\n"
-        f"[data-testid=\"stSidebar\"] * {{ color: {palette['text']}; }}\n"
-        f"[data-testid=\"stMarkdownContainer\"] {{ color: {palette['text']}; }}\n"
-        f"[data-testid=\"stExpander\"] {{ "
-        f"background-color: {palette['secondary_background']}; "
-        f"border: 1px solid {palette['card_border']}; }}\n"
-        f"div[data-testid=\"stMetricValue\"] {{ color: {palette['primary']}; }}\n"
-        "</style>"
-    )
+    return f"""<style>
+.stApp {{
+    background-color: {palette["background"]};
+    color: {palette["text"]};
+}}
+[data-testid="stSidebar"] {{
+    background-color: {palette["secondary_background"]};
+    border-right: 1px solid {palette["card_border"]};
+}}
+[data-testid="stSidebar"] * {{ color: {palette["text"]}; }}
+[data-testid="stMarkdownContainer"] {{ color: {palette["text"]}; }}
+
+[data-testid="stExpander"] {{
+    background-color: {palette["secondary_background"]};
+    border: 1px solid {palette["card_border"]};
+    border-radius: 12px;
+}}
+div[data-testid="stMetricValue"] {{
+    color: {palette["primary"]};
+    font-weight: 700;
+}}
+
+/* Cards: hover lift + rounded corners */
+[data-testid="stVerticalBlockBorderWrapper"] {{
+    border-radius: 14px !important;
+    border: 1px solid {palette["card_border"]} !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    background: {palette["secondary_background"]} !important;
+}}
+[data-testid="stVerticalBlockBorderWrapper"]:hover {{
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}}
+
+/* Header title */
+h1 {{
+    letter-spacing: -0.01em;
+    font-weight: 700 !important;
+}}
+
+/* Primary buttons */
+.stButton button[kind="primary"] {{
+    background-color: {palette["primary"]};
+    border: 1px solid {palette["primary"]};
+    border-radius: 8px;
+    font-weight: 600;
+}}
+
+/* Captions a bit muted */
+[data-testid="stCaptionContainer"] {{ opacity: 0.85; }}
+
+/* Tab labels: more breathing room */
+button[data-baseweb="tab"] {{
+    font-weight: 600;
+    padding: 0.45rem 1rem !important;
+}}
+
+/* Tighten image captions */
+[data-testid="stImageCaption"] {{
+    font-size: 0.78rem !important;
+    opacity: 0.7;
+}}
+</style>"""

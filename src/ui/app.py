@@ -474,7 +474,12 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
     locale = current_locale(st.session_state)
     theme = current_theme(st.session_state)
 
-    st.set_page_config(page_title=t("app_title", locale), page_icon=":mag:")
+    st.set_page_config(
+        page_title=t("app_title", locale),
+        page_icon=":mag:",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     st.markdown(theme_css(theme), unsafe_allow_html=True)
     st.title(t("app_title", locale))
     st.caption(t("app_caption", locale))
@@ -636,7 +641,9 @@ def _render_card(st, rank: int, hit: DestinationResult) -> None:  # pragma: no c
         score_col.metric(label="score", value=f"{hit.score:.3f}")
         meta_bits: list[str] = []
         if hit.country:
-            meta_bits.append(f":earth_americas: {hit.country}")
+            meta_bits.append(hit.country)
+        if hit.popularity is not None:
+            meta_bits.append(f"pop {hit.popularity:.2f}")
         meta_bits.append(f"`{hit.id}`")
         header.caption(" · ".join(meta_bits))
         _render_image_gallery(st, hit.image_urls, hit)
@@ -668,7 +675,7 @@ def _render_image_gallery(  # pragma: no cover - Streamlit
     )
     if len(valid_urls) == 1:
         try:
-            st.image(valid_urls[0], caption=alt, use_container_width=True)
+            st.image(valid_urls[0], caption=alt, width="stretch")
             credit = image_attribution(valid_urls[0])
             if credit:
                 st.caption(credit)
@@ -679,7 +686,7 @@ def _render_image_gallery(  # pragma: no cover - Streamlit
     for idx, url in enumerate(valid_urls[: IMAGE_GALLERY_THRESHOLD * 2]):
         col = cols[idx % IMAGE_GALLERY_THRESHOLD]
         try:
-            col.image(url, caption=alt, use_container_width=True)
+            col.image(url, caption=alt, width="stretch")
             credit = image_attribution(url)
             if credit:
                 col.caption(credit)
@@ -775,7 +782,7 @@ def _render_image_tab(st, *, top_k: int) -> None:  # pragma: no cover
             if uploaded is None:
                 st.warning("Sube una imagen primero.")
             else:
-                st.image(uploaded, caption="Imagen subida", use_container_width=True)
+                st.image(uploaded, caption="Imagen subida", width="stretch")
                 try:
                     resp = search_by_image_upload(uploaded.read(), top_k=top_k)
                 except httpx.HTTPError as exc:
@@ -821,7 +828,7 @@ def _render_image_results(st, resp: ImageSearchResponse) -> None:  # pragma: no 
             if hit.image_path:
                 alt = image_alt(name=hit.destination_id)
                 try:
-                    st.image(hit.image_path, caption=alt, use_container_width=True)
+                    st.image(hit.image_path, caption=alt, width="stretch")
                 except Exception:
                     st.caption(f"`{hit.image_path}`")
 
@@ -829,29 +836,39 @@ def _render_image_results(st, resp: ImageSearchResponse) -> None:  # pragma: no 
 def _render_onboarding(st) -> None:  # pragma: no cover - Streamlit
     """Initial profile picker (T097).
 
-    Presents the six synthetic personas as radio buttons. The choice is
-    persisted into ``st.session_state`` so the rest of the UI can read
-    it without re-asking the user.
+    Presents the six synthetic personas as a centered selector. The
+    choice is persisted into ``st.session_state`` so the rest of the
+    UI can read it without re-asking the user.
     """
-    st.subheader("¿Qué tipo de viajero eres?")
-    st.caption(
-        "Elige el perfil que más se parezca a ti. "
-        "Lo usaremos para personalizar la sección 'Recomendado para ti'."
-    )
+    spacer_l, content, spacer_r = st.columns([1, 3, 1])
+    with content:
+        st.markdown("## ¿Qué tipo de viajero eres?")
+        st.markdown(
+            "<p style='opacity:0.7;margin-top:-6px;font-size:0.95rem'>"
+            "Elige el perfil que más se parezca a ti. Lo usamos para "
+            "personalizar la sección <em>Recomendado para ti</em>."
+            "</p>",
+            unsafe_allow_html=True,
+        )
+        st.divider()
 
-    options = list_synthetic_profile_ids()
-    selection = st.radio(
-        "Perfil",
-        options=options,
-        index=0,
-        key="onboarding_radio",
-        format_func=synthetic_profile_label,
-    )
-    st.write(synthetic_profile_description(selection))
+        options = list_synthetic_profile_ids()
+        selection = st.radio(
+            "Perfil",
+            options=options,
+            index=0,
+            key="onboarding_radio",
+            format_func=synthetic_profile_label,
+            label_visibility="collapsed",
+            horizontal=True,
+        )
+        with st.container(border=True):
+            st.markdown(f"**{synthetic_profile_label(selection)}**")
+            st.write(synthetic_profile_description(selection))
 
-    if st.button("Continuar", type="primary"):
-        store_selected_profile(st.session_state, selection)
-        st.rerun()
+        if st.button("Continuar", type="primary", width="stretch"):
+            store_selected_profile(st.session_state, selection)
+            st.rerun()
 
 
 def _render_profile_sidebar(st) -> None:  # pragma: no cover - Streamlit
@@ -941,6 +958,7 @@ def _render_results_map(  # pragma: no cover - Streamlit
     st.caption(
         f"{len(geocoded)} de {len(results)} resultados tienen coordenadas."
     )
+    # streamlit-folium aun usa la API anterior, no acepta width="stretch".
     st_folium(fmap, height=MAP_HEIGHT_PX, use_container_width=True)
 
 
