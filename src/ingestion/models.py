@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class Destination(BaseModel):
@@ -20,7 +20,12 @@ class Destination(BaseModel):
         description="Descripción normalizada (sin acentos, minúsculas) para matching/indexación",
     )
     tags: List[str] = Field(default_factory=list, description="Lista de etiquetas o categorías")
-    image_urls: List[HttpUrl] = Field(default_factory=list, description="URLs de imágenes")
+    # T126: aceptar tanto URLs absolutas como paths locales relativos
+    # (las imagenes descargadas por scripts/download_images.py viven en disco).
+    image_urls: List[str] = Field(
+        default_factory=list,
+        description="URLs absolutas o paths locales de imágenes del destino.",
+    )
     coordinates: Optional[Tuple[float, float]] = Field(
         None, description="Coordenadas geográficas (latitud, longitud)"
     )

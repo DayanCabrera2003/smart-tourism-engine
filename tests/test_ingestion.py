@@ -47,7 +47,7 @@ def test_destination_creation_full():
     dest = Destination(**data)
     assert dest.region == "Cataluña"
     assert "playa" in dest.tags
-    assert str(dest.image_urls[0]) == "https://example.com/bcn.jpg"
+    assert dest.image_urls[0] == "https://example.com/bcn.jpg"
     assert dest.coordinates == (41.385063, 2.173404)
     assert dest.fetched_at == datetime(2026, 4, 7)
 
@@ -63,6 +63,10 @@ def test_destination_missing_required():
 def test_destination_invalid_types():
     """
     Verifica que falla con tipos de datos incorrectos.
+
+    T126: image_urls ahora acepta paths locales además de URLs, así que
+    validamos un tipo incorrecto en otro campo (coordinates espera
+    tupla de dos floats).
     """
     with pytest.raises(ValidationError):
         Destination(
@@ -71,5 +75,18 @@ def test_destination_invalid_types():
             country="Test",
             description="Test",
             source="Test",
-            image_urls=["no-es-una-url"],
+            coordinates="not-a-tuple",  # type: ignore[arg-type]
         )
+
+
+def test_destination_accepts_local_image_paths():
+    """T126: image_urls puede contener paths relativos del corpus local."""
+    dest = Destination(
+        id="madrid-es",
+        name="Madrid",
+        country="España",
+        description="Capital.",
+        source="manual",
+        image_urls=["data/raw/images/madrid-es/wikipedia.jpg"],
+    )
+    assert dest.image_urls == ["data/raw/images/madrid-es/wikipedia.jpg"]
