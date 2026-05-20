@@ -42,8 +42,11 @@ class _StubEmbedder:
     def embed(self, text: str, mode: str = "query") -> list[float]:
         del mode  # parity with the real embedder; ignored by the stub.
         key = text.strip().lower()
-        if key in self.VECTORS:
-            return list(self.VECTORS[key])
+        # Containment lookup so expanded queries like "beach playa beaches"
+        # resolve to the same fixed vector as "beach" alone.
+        for token, vec in self.VECTORS.items():
+            if token in key:
+                return list(vec)
         raw = [float((ord(c) % 7) + 1) for c in (key or "x")[:DIM]]
         raw.extend([0.0] * (DIM - len(raw)))
         norm = math.sqrt(sum(v * v for v in raw)) or 1.0

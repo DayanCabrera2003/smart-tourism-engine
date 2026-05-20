@@ -217,11 +217,14 @@ def _build_cross_encoder_if_enabled(use_cross_encoder: bool):
 
 
 def make_semantic_runner(
-    use_reranker: bool = False, use_cross_encoder: bool = False
+    use_reranker: bool = False,
+    use_cross_encoder: bool = False,
+    expand: bool = True,
 ) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
     from src.indexing.embedder import TextEmbedder
     from src.indexing.vector_store import VectorStore
+    from src.retrieval.bilingual_query import expand_query
     from src.retrieval.geo_filter import filter_search_hits
 
     embedder = TextEmbedder()
@@ -231,7 +234,8 @@ def make_semantic_runner(
     ce = _build_cross_encoder_if_enabled(use_cross_encoder)
 
     def run(query: str) -> list[str]:
-        vector = embedder.embed(query, mode="query")
+        expanded = expand_query(query) if expand else query
+        vector = embedder.embed(expanded, mode="query")
         raw = store.search(DEFAULT_COLLECTION, vector, top_k=200)
         filtered = filter_search_hits(raw, query)
         pairs = [
@@ -247,14 +251,16 @@ def make_semantic_runner(
 
 
 def make_hybrid_runner(
-    alpha: float = 0.3,
+    alpha: float = 0.4,
     p: float = 2.0,
     use_reranker: bool = False,
     use_cross_encoder: bool = False,
+    expand: bool = True,
 ) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
     from src.indexing.embedder import TextEmbedder
     from src.indexing.vector_store import VectorStore
+    from src.retrieval.bilingual_query import expand_query
     from src.retrieval.extended_boolean import ExtendedBoolean
     from src.retrieval.geo_filter import apply_country_filter
     from src.retrieval.hybrid import HybridRetriever
@@ -277,7 +283,8 @@ def make_hybrid_runner(
     ce = _build_cross_encoder_if_enabled(use_cross_encoder)
 
     def run(query: str) -> list[str]:
-        hits = hybrid.search(query, index, top_k=200)
+        expanded = expand_query(query) if expand else query
+        hits = hybrid.search(expanded, index, top_k=200)
         hits_country = [
             (doc_id, score, (destinations.get(doc_id) or {}).get("country"))
             for doc_id, score in hits

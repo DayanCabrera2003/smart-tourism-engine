@@ -147,14 +147,14 @@ class HybridSearchRequest(BaseModel):
         description="Número máximo de resultados a devolver.",
     )
     alpha: float = Field(
-        0.3,
+        0.4,
         ge=0.0,
         le=1.0,
         description=(
             "Peso de la rama léxica en [0, 1]. "
             "alpha=1.0 → solo Booleano Extendido; alpha=0.0 → solo semántico. "
-            "Default 0.3 medido contra el eval set v2 — el lado denso es "
-            "considerablemente más fuerte en este corpus."
+            "Default 0.4 medido contra el eval set v2 con expansion bilingüe "
+            "activada — combina lo mejor de las dos ramas."
         ),
     )
     p: float = Field(

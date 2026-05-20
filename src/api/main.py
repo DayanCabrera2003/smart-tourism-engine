@@ -58,6 +58,7 @@ from src.indexing.embed_destinations import DEFAULT_COLLECTION
 from src.indexing.embedder import TextEmbedder
 from src.indexing.inverted_index import InvertedIndex
 from src.indexing.vector_store import VectorStore
+from src.retrieval.bilingual_query import expand_query
 from src.retrieval.extended_boolean import ExtendedBoolean
 from src.retrieval.freshness import freshness_score
 from src.retrieval.geo_filter import (
@@ -469,8 +470,11 @@ def search_semantic(
     try:
         # Explicit "query" mode prepends the prefix multilingual-e5-small
         # expects for short user input; matches how the corpus was
-        # embedded with mode="passage".
-        query_vector = embedder.embed(request.query, mode="query")
+        # embedded with mode="passage". The bilingual expansion appends
+        # tourism keywords in the opposite language so cross-language
+        # matches (Spanish query → English document) resolve as well.
+        expanded = expand_query(request.query)
+        query_vector = embedder.embed(expanded, mode="query")
         raw_hits = store.search(collection, query_vector, top_k=fetch_k)
     except Exception as exc:  # pragma: no cover - delegado a middleware
         raise HTTPException(
@@ -538,7 +542,11 @@ def search_hybrid(
     )
     # T127.2: same aggressive over-fetch when the query has a location.
     fetch_k = 200 if detect_countries(request.query) else max(request.top_k * 3, 30)
-    hits = hybrid.search(request.query, index, top_k=fetch_k)
+    # Bilingual expansion before retrieval lets the dense branch resolve
+    # cross-language matches (Spanish query → English document) that
+    # the embedder otherwise leaves on the table.
+    expanded = expand_query(request.query)
+    hits = hybrid.search(expanded, index, top_k=fetch_k)
     hits_with_country = [
         (doc_id, score, (destinations.get(doc_id) or {}).get("country"))
         for doc_id, score in hits
