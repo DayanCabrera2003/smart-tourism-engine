@@ -64,11 +64,18 @@ def load_eval_set(path: Path) -> list[QueryRecord]:
 
 
 def precision_at_k(retrieved: list[str], relevant: frozenset[str], k: int) -> float:
-    if not retrieved:
+    """Precision@K following the standard IR definition (divide by ``k``).
+
+    Dividing by ``len(head)`` would inflate the score for queries that
+    return fewer than ``k`` documents (a 3-out-of-3 perfect retrieval
+    would read as P@10=1.0 instead of 0.3). The standard P@K is always
+    ``relevant_retrieved / k``.
+    """
+    if k <= 0:
         return 0.0
     head = retrieved[:k]
     hit = sum(1 for d in head if d in relevant)
-    return hit / max(1, len(head))
+    return hit / k
 
 
 def recall_at_k(retrieved: list[str], relevant: frozenset[str], k: int) -> float:
