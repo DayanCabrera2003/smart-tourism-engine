@@ -89,6 +89,31 @@ def test_parse_skips_disambiguation_alt_template(tmp_path: Path) -> None:
     assert parser.parse_file(path) is None
 
 
+def test_parse_skips_disamb_short_template(tmp_path: Path) -> None:
+    """Wikivoyage also uses the abbreviated `{{disamb}}` template."""
+    # Fixture has > MIN_DESCRIPTION_CHARS of cleaned body so that the
+    # only signal left for detection is the {{disamb}} template itself.
+    content = (
+        "{{pagebanner|Disambiguation banner.png}}\n"
+        "__NOTOC__\n"
+        "There is more than one place which has '''San José''' as all or "
+        "part of its name. San José is the Spanish form of the name. There "
+        "are also places that use the English or French form; see Saint "
+        "Joseph. You could be looking for:\n"
+        "* [[San José (Costa Rica)]] - The capital of Costa Rica, located "
+        "in the Central Valley with about 350 000 inhabitants and a "
+        "thriving cultural scene.\n"
+        "* [[San José del Cabo]] - a town in Baja California Sur, known "
+        "for its arts district and quiet beaches near the southern tip of "
+        "the Baja peninsula.\n"
+        "{{disamb}}\n"
+    )
+    path = _write_raw(tmp_path, "San Jose", content)
+    parser = WikivoyageParser()
+
+    assert parser.parse_file(path) is None
+
+
 def test_parse_skips_when_description_below_min_length(tmp_path: Path) -> None:
     """Even non-redirect pages must have a usable amount of body text."""
     short_body = "A tiny stub with not much to say. " * 2  # < 200 chars

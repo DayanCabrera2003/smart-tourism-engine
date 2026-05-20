@@ -19,9 +19,11 @@ MIN_DESCRIPTION_CHARS = 200
 # decision is robust against template-stripping side effects.
 _REDIRECT_RE = re.compile(r"^\s*#redirect\s*\[\[", re.IGNORECASE)
 # Disambiguation pages mark themselves with one of these templates. The
-# names follow Wikivoyage / Wikipedia conventions.
+# names follow Wikivoyage / Wikipedia conventions. Wikivoyage in
+# particular uses both the long form ``{{disambiguation}}`` and the short
+# ``{{disamb}}`` (notice the missing trailing "ig").
 _DISAMBIG_TEMPLATE_RE = re.compile(
-    r"\{\{\s*(disambig(?:uation)?|geodis|hndis|setindex)\b",
+    r"\{\{\s*(disamb(?:ig(?:uation)?)?|geodis|hndis|setindex)\b",
     re.IGNORECASE,
 )
 
