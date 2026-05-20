@@ -1,11 +1,14 @@
 """Tests for T127 — geographic filter for dense retrieval."""
 from __future__ import annotations
 
+import pytest
+
 from src.retrieval.geo_filter import (
     apply_country_filter,
     detect_countries,
     filter_search_hits,
     normalize,
+    query_has_country_alias,
 )
 
 # ─── normalize ────────────────────────────────────────────────────────
@@ -38,6 +41,42 @@ def test_detect_countries_finds_accented_name() -> None:
 
 def test_detect_countries_finds_english_name() -> None:
     assert detect_countries("cities in Germany") == {"Germany"}
+
+
+@pytest.mark.parametrize(
+    "query, expected_country",
+    [
+        ("ciudades italianas", "Italy"),
+        ("ciudades japonesas", "Japan"),
+        ("ciudades españolas", "Spain"),
+        ("destinos franceses", "France"),
+        ("playas brasileñas", "Brazil"),
+        ("Japanese cities", "Japan"),
+        ("Italian cities", "Italy"),
+        ("destinos mexicanos", "Mexico"),
+        ("ciudades chinas", "China"),
+    ],
+)
+def test_detect_countries_recognises_adjective_forms(
+    query: str, expected_country: str
+) -> None:
+    detected = detect_countries(query)
+    assert expected_country in detected, f"{expected_country} not in {detected} for {query!r}"
+
+
+def test_query_has_country_alias_true_for_country() -> None:
+    assert query_has_country_alias("ciudades en España") is True
+    assert query_has_country_alias("ciudades italianas") is True
+
+
+def test_query_has_country_alias_false_for_region_only() -> None:
+    assert query_has_country_alias("playas en el caribe") is False
+    assert query_has_country_alias("destinos en europa") is False
+
+
+def test_query_has_country_alias_false_for_no_alias() -> None:
+    assert query_has_country_alias("ciudades históricas") is False
+    assert query_has_country_alias("") is False
 
 
 def test_detect_countries_finds_multiple() -> None:
@@ -82,12 +121,24 @@ def test_apply_country_filter_returns_input_when_no_country_detected() -> None:
     assert out == hits
 
 
-def test_apply_country_filter_returns_input_when_filter_would_empty() -> None:
+def test_apply_country_filter_falls_back_to_input_when_empty() -> None:
+    """Default behaviour: empty filter -> unfiltered list back."""
     hits = [{"id": "a", "country": "Italy"}]
-    # 'Cuba' is in the query but no Cuban hits; we keep the original
-    # so the user does not see a blank page.
     out = apply_country_filter(hits, "playas en cuba")
     assert out == hits
+
+
+def test_apply_country_filter_strict_returns_empty_when_no_match() -> None:
+    hits = [{"id": "a", "country": "Italy"}]
+    out = apply_country_filter(hits, "playas en cuba", strict=True)
+    assert out == []
+
+
+def test_apply_country_filter_strict_does_not_kick_in_when_match_exists() -> None:
+    """Strict only matters when filtering would empty the result."""
+    hits = [{"id": "a", "country": "Cuba"}, {"id": "b", "country": "Italy"}]
+    out = apply_country_filter(hits, "playas en cuba", strict=True)
+    assert out == [{"id": "a", "country": "Cuba"}]
 
 
 def test_apply_country_filter_handles_objects_with_country_attr() -> None:

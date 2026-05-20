@@ -57,77 +57,444 @@ def normalize(text: str) -> str:
 # keep this list small: only countries present in the Wikivoyage
 # corpus (~45). Additions are cheap; spurious matches are not.
 COUNTRY_ALIASES: dict[str, set[str]] = {
-    "Spain": {"spain", "espana", "españa"},
-    "France": {"france", "francia"},
-    "Italy": {"italy", "italia"},
-    "Germany": {"germany", "alemania"},
+    # The aliases include the country name in English and Spanish plus
+    # the adjective forms ("italianas", "japoneses", "españolas"), so a
+    # query like "ciudades italianas" can be resolved geographically
+    # even when the user does not write the country name explicitly.
+    "Spain": {
+        "spain",
+        "espana",
+        "españa",
+        "spanish",
+        "español",
+        "espanol",
+        "española",
+        "espanola",
+        "españoles",
+        "espanoles",
+        "españolas",
+        "espanolas",
+    },
+    "France": {
+        "france",
+        "francia",
+        "french",
+        "frances",
+        "francés",
+        "francesa",
+        "franceses",
+        "francesas",
+    },
+    "Italy": {
+        "italy",
+        "italia",
+        "italian",
+        "italiano",
+        "italiana",
+        "italianos",
+        "italianas",
+    },
+    "Germany": {
+        "germany",
+        "alemania",
+        "german",
+        "aleman",
+        "alemán",
+        "alemana",
+        "alemanes",
+        "alemanas",
+    },
     "United Kingdom": {
         "united kingdom",
         "reino unido",
         "uk",
         "great britain",
         "gran bretana",
+        "british",
+        "britanico",
+        "británico",
+        "britanica",
+        "británica",
+        "britanicos",
+        "británicos",
+        "britanicas",
+        "británicas",
+        "english",
         "england",
         "inglaterra",
+        "ingles",
+        "inglés",
+        "inglesa",
+        "ingleses",
+        "inglesas",
         "scotland",
         "escocia",
+        "scottish",
+        "escoces",
+        "escocés",
+        "escocesa",
+        "escoceses",
+        "escocesas",
         "wales",
         "gales",
+        "welsh",
     },
-    "Japan": {"japan", "japon"},
-    "China": {"china"},
+    "Japan": {
+        "japan",
+        "japon",
+        "japón",
+        "japanese",
+        "japones",
+        "japonés",
+        "japonesa",
+        "japoneses",
+        "japonesas",
+    },
+    "China": {
+        "china",
+        "chino",
+        "chinos",
+        "chinas",
+        "chinese",
+    },
     "United States": {
         "united states",
         "usa",
         "estados unidos",
         "us",
         "estadounidense",
-        "america",
+        "estadounidenses",
+        "american",
+        "americano",
+        "americana",
+        "americanos",
+        "americanas",
     },
-    "Mexico": {"mexico", "méxico"},
-    "Brazil": {"brazil", "brasil"},
-    "Peru": {"peru", "perú"},
-    "Thailand": {"thailand", "tailandia"},
-    "Colombia": {"colombia"},
-    "Argentina": {"argentina"},
-    "Cuba": {"cuba"},
-    "Chile": {"chile"},
-    "Australia": {"australia"},
-    "Canada": {"canada", "canadá"},
-    "Russia": {"russia", "rusia"},
-    "India": {"india"},
-    "Egypt": {"egypt", "egipto"},
-    "Greece": {"greece", "grecia"},
-    "Turkey": {"turkey", "turquia", "turquía"},
-    "Vietnam": {"vietnam"},
-    "South Korea": {"south korea", "corea del sur", "korea"},
-    "Indonesia": {"indonesia"},
+    "Mexico": {
+        "mexico",
+        "méxico",
+        "mexican",
+        "mexicano",
+        "mexicana",
+        "mexicanos",
+        "mexicanas",
+    },
+    "Brazil": {
+        "brazil",
+        "brasil",
+        "brazilian",
+        "brasileño",
+        "brasileno",
+        "brasileña",
+        "brasilena",
+        "brasileños",
+        "brasilenos",
+        "brasileñas",
+        "brasilenas",
+    },
+    "Peru": {
+        "peru",
+        "perú",
+        "peruvian",
+        "peruano",
+        "peruana",
+        "peruanos",
+        "peruanas",
+    },
+    "Thailand": {
+        "thailand",
+        "tailandia",
+        "thai",
+        "tailandes",
+        "tailandés",
+        "tailandesa",
+        "tailandeses",
+        "tailandesas",
+    },
+    "Colombia": {
+        "colombia",
+        "colombian",
+        "colombiano",
+        "colombiana",
+        "colombianos",
+        "colombianas",
+    },
+    "Argentina": {
+        "argentina",
+        "argentinian",
+        "argentino",
+        "argentinos",
+        "argentinas",
+    },
+    "Cuba": {
+        "cuba",
+        "cuban",
+        "cubano",
+        "cubana",
+        "cubanos",
+        "cubanas",
+    },
+    "Chile": {
+        "chile",
+        "chilean",
+        "chileno",
+        "chilena",
+        "chilenos",
+        "chilenas",
+    },
+    "Australia": {
+        "australia",
+        "australian",
+        "australiano",
+        "australiana",
+        "australianos",
+        "australianas",
+    },
+    "Canada": {
+        "canada",
+        "canadá",
+        "canadian",
+        "canadiense",
+        "canadienses",
+    },
+    "Russia": {"russia", "rusia", "russian", "ruso", "rusa", "rusos", "rusas"},
+    "India": {"india", "indian", "indio", "indios", "indias", "hindu"},
+    "Egypt": {
+        "egypt",
+        "egipto",
+        "egyptian",
+        "egipcio",
+        "egipcia",
+        "egipcios",
+        "egipcias",
+    },
+    "Greece": {
+        "greece",
+        "grecia",
+        "greek",
+        "griego",
+        "griega",
+        "griegos",
+        "griegas",
+    },
+    "Turkey": {
+        "turkey",
+        "turquia",
+        "turquía",
+        "turkish",
+        "turco",
+        "turca",
+        "turcos",
+        "turcas",
+    },
+    "Vietnam": {
+        "vietnam",
+        "vietnamese",
+        "vietnamita",
+        "vietnamitas",
+    },
+    "South Korea": {
+        "south korea",
+        "corea del sur",
+        "korea",
+        "coreano",
+        "coreana",
+        "coreanos",
+        "coreanas",
+        "korean",
+    },
+    "Indonesia": {
+        "indonesia",
+        "indonesian",
+        "indonesio",
+        "indonesios",
+        "indonesias",
+    },
     "Singapore": {"singapore", "singapur"},
     "Malaysia": {"malaysia", "malasia"},
     "United Arab Emirates": {"united arab emirates", "emiratos arabes unidos", "uae"},
-    "Morocco": {"morocco", "marruecos"},
-    "Costa Rica": {"costa rica"},
-    "Dominican Republic": {"dominican republic", "republica dominicana"},
-    "Ecuador": {"ecuador"},
-    "Bolivia": {"bolivia"},
-    "Uruguay": {"uruguay"},
-    "Paraguay": {"paraguay"},
-    "Portugal": {"portugal"},
-    "Netherlands": {"netherlands", "paises bajos", "holanda", "holland"},
-    "Belgium": {"belgium", "belgica", "bélgica"},
-    "Czech Republic": {"czech republic", "republica checa", "chequia"},
-    "Austria": {"austria"},
-    "Switzerland": {"switzerland", "suiza"},
-    "Hungary": {"hungary", "hungria", "hungría"},
-    "Poland": {"poland", "polonia"},
-    "Norway": {"norway", "noruega"},
-    "Sweden": {"sweden", "suecia"},
-    "Denmark": {"denmark", "dinamarca"},
-    "Finland": {"finland", "finlandia"},
-    "Ireland": {"ireland", "irlanda"},
-    "Iceland": {"iceland", "islandia"},
-    "Croatia": {"croatia", "croacia"},
-    "South Africa": {"south africa", "sudafrica", "sudáfrica"},
+    "Morocco": {
+        "morocco",
+        "marruecos",
+        "moroccan",
+        "marroqui",
+        "marroquí",
+        "marroquies",
+        "marroquíes",
+    },
+    "Costa Rica": {"costa rica", "costarricense", "costarricenses"},
+    "Dominican Republic": {
+        "dominican republic",
+        "republica dominicana",
+        "dominicano",
+        "dominicana",
+        "dominicanos",
+        "dominicanas",
+    },
+    "Ecuador": {
+        "ecuador",
+        "ecuadorian",
+        "ecuatoriano",
+        "ecuatoriana",
+        "ecuatorianos",
+        "ecuatorianas",
+    },
+    "Bolivia": {
+        "bolivia",
+        "bolivian",
+        "boliviano",
+        "boliviana",
+        "bolivianos",
+        "bolivianas",
+    },
+    "Uruguay": {
+        "uruguay",
+        "uruguayan",
+        "uruguayo",
+        "uruguaya",
+        "uruguayos",
+        "uruguayas",
+    },
+    "Paraguay": {
+        "paraguay",
+        "paraguayan",
+        "paraguayo",
+        "paraguaya",
+        "paraguayos",
+        "paraguayas",
+    },
+    "Portugal": {
+        "portugal",
+        "portuguese",
+        "portugues",
+        "portugués",
+        "portuguesa",
+        "portugueses",
+        "portuguesas",
+    },
+    "Netherlands": {
+        "netherlands",
+        "paises bajos",
+        "holanda",
+        "holland",
+        "dutch",
+        "holandes",
+        "holandés",
+        "holandesa",
+        "holandeses",
+        "holandesas",
+    },
+    "Belgium": {
+        "belgium",
+        "belgica",
+        "bélgica",
+        "belgian",
+        "belga",
+        "belgas",
+    },
+    "Czech Republic": {
+        "czech republic",
+        "republica checa",
+        "chequia",
+        "checo",
+        "checa",
+        "checos",
+        "checas",
+    },
+    "Austria": {
+        "austria",
+        "austrian",
+        "austriaco",
+        "austriaca",
+        "austriacos",
+        "austriacas",
+    },
+    "Switzerland": {
+        "switzerland",
+        "suiza",
+        "swiss",
+        "suizo",
+        "suizos",
+        "suizas",
+    },
+    "Hungary": {
+        "hungary",
+        "hungria",
+        "hungría",
+        "hungarian",
+        "hungaro",
+        "húngaro",
+        "hungara",
+        "húngara",
+        "hungaros",
+        "húngaros",
+        "hungaras",
+        "húngaras",
+    },
+    "Poland": {
+        "poland",
+        "polonia",
+        "polish",
+        "polaco",
+        "polaca",
+        "polacos",
+        "polacas",
+    },
+    "Norway": {
+        "norway",
+        "noruega",
+        "norwegian",
+        "noruego",
+        "noruegos",
+        "noruegas",
+    },
+    "Sweden": {"sweden", "suecia", "swedish", "sueco", "sueca", "suecos", "suecas"},
+    "Denmark": {
+        "denmark",
+        "dinamarca",
+        "danish",
+        "danes",
+        "danés",
+        "danesa",
+        "daneses",
+        "danesas",
+    },
+    "Finland": {
+        "finland",
+        "finlandia",
+        "finnish",
+        "finlandes",
+        "finlandés",
+        "finlandesa",
+        "finlandeses",
+        "finlandesas",
+    },
+    "Ireland": {"ireland", "irlanda", "irish", "irlandes", "irlandés", "irlandesa"},
+    "Iceland": {
+        "iceland",
+        "islandia",
+        "icelandic",
+        "islandes",
+        "islandés",
+        "islandesa",
+    },
+    "Croatia": {
+        "croatia",
+        "croacia",
+        "croatian",
+        "croata",
+        "croatas",
+    },
+    "South Africa": {
+        "south africa",
+        "sudafrica",
+        "sudáfrica",
+        "south african",
+        "sudafricano",
+        "sudafricana",
+        "sudafricanos",
+        "sudafricanas",
+    },
 }
 
 
@@ -252,18 +619,46 @@ _REGION_ALIASES: dict[str, set[str]] = {
 
 
 def _build_location_aliases() -> dict[str, set[str]]:
-    """Flatten countries + regions into ``alias -> set of countries``."""
+    """Flatten countries + regions into ``alias -> set of countries``.
+
+    All aliases are stored in their accent-stripped, lower-case form so
+    that matching works against ``normalize(query)`` without further
+    transformation. The author can write the alias with diacritics for
+    readability (``"japón"``) and it gets normalized automatically.
+    """
     table: dict[str, set[str]] = {}
     for country, aliases in COUNTRY_ALIASES.items():
         for alias in aliases:
-            table.setdefault(alias, set()).add(country)
+            normalized_alias = normalize(alias)
+            table.setdefault(normalized_alias, set()).add(country)
     for region, countries in REGION_TO_COUNTRIES.items():
         for alias in _REGION_ALIASES.get(region, set()):
-            table.setdefault(alias, set()).update(countries)
+            normalized_alias = normalize(alias)
+            table.setdefault(normalized_alias, set()).update(countries)
     return table
 
 
 LOCATION_ALIASES: dict[str, set[str]] = _build_location_aliases()
+
+
+def _build_country_alias_set() -> set[str]:
+    """Set of aliases that resolve to a single concrete country.
+
+    Used to distinguish a query that mentions a specific country
+    ("ciudades japonesas") from one that only mentions a region
+    ("ciudades en el Caribe"). The first should trigger strict
+    filtering (return empty when no candidate matches the country);
+    the second falls back to the unfiltered list because a region is
+    inherently ambiguous.
+    """
+    out: set[str] = set()
+    for aliases in COUNTRY_ALIASES.values():
+        for alias in aliases:
+            out.add(normalize(alias))
+    return out
+
+
+_COUNTRY_ALIAS_SET: set[str] = _build_country_alias_set()
 
 
 def _alias_pattern(alias: str) -> re.Pattern[str]:
@@ -301,11 +696,29 @@ def detect_countries(query: str) -> set[str]:
     return hits
 
 
+def query_has_country_alias(query: str) -> bool:
+    """Return True iff the query mentions a specific country alias.
+
+    Distinguishes "ciudades en España" (country alias → strict-ready)
+    from "ciudades en el Caribe" (region only → not strict). Helps
+    callers decide whether to apply :func:`apply_country_filter` with
+    ``strict=True``.
+    """
+    if not query or not query.strip():
+        return False
+    normalized = normalize(query)
+    for alias in _COUNTRY_ALIAS_SET:
+        if re.search(rf"\b{re.escape(alias)}\b", normalized):
+            return True
+    return False
+
+
 def apply_country_filter(
     hits: list[Any],
     query: str,
     *,
     country_getter=None,
+    strict: bool = False,
 ) -> list[Any]:
     """Filter ``hits`` to those whose country matches the query.
 
@@ -317,21 +730,29 @@ def apply_country_filter(
             reading the ``country`` key on a dict-like payload or
             attribute, falling back to ``None`` when neither is
             available.
+        strict: when ``True``, an empty filtered result is returned
+            verbatim instead of falling back to the unfiltered list.
+            Default is ``False`` because making strict automatic on
+            country aliases empties the lexical retriever for
+            Spanish queries against an English corpus (it has no
+            country-matching candidates in its top-N).
 
     Returns the filtered list. When no country is detected in the
-    query, or when filtering would empty the result, the input list
-    is returned unchanged so the user still gets *something* (we do
-    not want a country filter to turn a useful query into a blank
-    page).
+    query, the input list is returned unchanged. When filtering would
+    empty the result, ``strict=True`` returns ``[]`` (and the UI can
+    render "no results"); ``strict=False`` falls back to the
+    unfiltered list so the user still sees *something*.
     """
     targets = detect_countries(query)
     if not targets:
         return list(hits)
     getter = country_getter or _default_country_getter
     filtered = [hit for hit in hits if (getter(hit) or "") in targets]
-    if not filtered:
-        return list(hits)
-    return filtered
+    if filtered:
+        return filtered
+    if strict:
+        return []
+    return list(hits)
 
 
 def _default_country_getter(hit: Any) -> str | None:
@@ -344,15 +765,19 @@ def _default_country_getter(hit: Any) -> str | None:
 def filter_search_hits(
     raw_hits: Iterable[tuple[Any, float, dict[str, Any]]],
     query: str,
+    *,
+    strict: bool | None = None,
 ) -> list[tuple[Any, float, dict[str, Any]]]:
     """Convenience wrapper for tuples ``(point_id, score, payload)``.
 
     Reads the country from ``payload['country']``. Used by the
-    semantic / hybrid endpoints in :mod:`src.api.main`.
+    semantic / hybrid endpoints in :mod:`src.api.main`. ``strict``
+    propagates to :func:`apply_country_filter`.
     """
     hits = list(raw_hits)
     return apply_country_filter(
         hits,
         query,
         country_getter=lambda h: h[2].get("country") if h[2] else None,
+        strict=strict,
     )
