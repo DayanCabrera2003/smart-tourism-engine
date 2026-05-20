@@ -27,20 +27,6 @@ def test_p_must_be_greater_than_zero():
         ExtendedBoolean(p=-1.0)
 
 
-# ── score stub ────────────────────────────────────────────────────────────────
-
-def test_score_returns_zero_stub():
-    """score() sigue siendo stub hasta T035/T036 (parser + evaluador AST)."""
-    eb = ExtendedBoolean(p=2.0)
-    assert eb.score("turismo AND playa", "doc1") == 0.0
-
-
-def test_score_return_type_is_float():
-    eb = ExtendedBoolean(p=2.0)
-    result = eb.score("turismo", "doc1")
-    assert isinstance(result, float)
-
-
 # ── T033: OR p-norm ───────────────────────────────────────────────────────────
 
 def test_or_norm_empty_weights_returns_zero():

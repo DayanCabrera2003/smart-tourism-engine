@@ -178,18 +178,3 @@ class ExtendedBoolean:
             scores[doc_id] = self.evaluate(ast, doc_weights)
 
         return heapq.nlargest(top_k, scores.items(), key=lambda x: x[1])
-
-    def score(self, query: str, doc_id: str) -> float:
-        """
-        Calcula la similitud p-norm entre una consulta y un documento.
-
-        Esqueleto — implementación completa en T033 (OR) y T034 (AND).
-
-        Args:
-            query:  Consulta con operadores AND/OR/NOT.
-            doc_id: Identificador del documento a puntuar.
-
-        Returns:
-            Similitud en [0, 1]. Actualmente siempre devuelve 0.0.
-        """
-        return 0.0
