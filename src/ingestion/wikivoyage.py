@@ -8,6 +8,23 @@ from typing import Optional
 from src.ingestion.models import Destination
 from src.logging_config import logger
 
+# Minimum length (in characters) of a cleaned description for a Wikivoyage
+# entry to be considered useful. Pages below this length are almost always
+# stubs (disambig leftovers, short notices, parsing artifacts) and pollute
+# both the lexical index and the dense retriever.
+MIN_DESCRIPTION_CHARS = 200
+
+# Wikitext patterns that identify pages we must skip during ingestion.
+# These are detected on the raw revision content *before* cleaning so the
+# decision is robust against template-stripping side effects.
+_REDIRECT_RE = re.compile(r"^\s*#redirect\s*\[\[", re.IGNORECASE)
+# Disambiguation pages mark themselves with one of these templates. The
+# names follow Wikivoyage / Wikipedia conventions.
+_DISAMBIG_TEMPLATE_RE = re.compile(
+    r"\{\{\s*(disambig(?:uation)?|geodis|hndis|setindex)\b",
+    re.IGNORECASE,
+)
+
 
 class WikivoyageParser:
     """
@@ -56,7 +73,12 @@ class WikivoyageParser:
         return text[:500]
 
     def parse_file(self, file_path: Path) -> Optional[Destination]:
-        """Procesa un archivo JSON de la API de Wikivoyage."""
+        """Procesa un archivo JSON de la API de Wikivoyage.
+
+        Returns ``None`` for pages that should not enter the index:
+        ``#REDIRECT`` stubs, disambiguation pages, and pages whose cleaned
+        description does not reach :data:`MIN_DESCRIPTION_CHARS`.
+        """
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -69,6 +91,28 @@ class WikivoyageParser:
             title = page["title"]
             content = page["revisions"][0]["content"]
 
+            # Drop redirect stubs before any text cleaning, otherwise the
+            # cleaned description ends up as "<target>" and looks like a
+            # legitimate (but useless) very short page.
+            if _REDIRECT_RE.search(content):
+                logger.info("Skipping redirect page: %s", title)
+                return None
+
+            # Drop disambiguation pages identified by their template.
+            if _DISAMBIG_TEMPLATE_RE.search(content):
+                logger.info("Skipping disambiguation page: %s", title)
+                return None
+
+            description = self.clean_text(content)
+            if len(description) < MIN_DESCRIPTION_CHARS:
+                logger.info(
+                    "Skipping short page (%d < %d chars): %s",
+                    len(description),
+                    MIN_DESCRIPTION_CHARS,
+                    title,
+                )
+                return None
+
             # Extraer coordenadas
             geo_match = self.geo_re.search(content)
             coords = None
@@ -80,7 +124,7 @@ class WikivoyageParser:
                 id=self._make_id(title),
                 name=title,
                 country=self.default_country,  # Ahora configurable
-                description=self.clean_text(content),
+                description=description,
                 coordinates=coords,
                 tags=["city", "wikivoyage"],  # Tags base
                 source="wikivoyage",

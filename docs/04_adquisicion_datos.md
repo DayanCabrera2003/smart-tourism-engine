@@ -37,6 +37,16 @@ Para el desarrollo inicial, se ha implementado un pipeline de adquisición liger
 1. **Descarga (`scripts/download_wikivoyage.py`)**: Utiliza la API de MediaWiki para obtener el contenido crudo (wikitext) de destinos seleccionados de España en formato JSON.
 2. **Parsing (`src/ingestion/wikivoyage.py`)**: Procesa el wikitext, extrae coordenadas geográficas, limpia etiquetas y genera objetos `Destination` unificados en `data/raw/destinations_raw.jsonl`.
 
+#### Filtros de calidad aplicados en el parser
+
+El parser de Wikivoyage descarta antes de la normalización los siguientes tipos de página, que en la práctica son ruido y degradan tanto el índice léxico como el recuperador denso (ver informe de análisis de mayo de 2026):
+
+- **Redirecciones (`#REDIRECT [[X]]`)**: el contenido sólo apunta a otro título sin texto propio. Wikivoyage tenía varios stubs así (Málaga, Cádiz, Córdoba, San Sebastián, etc.) que entraban al índice con descripciones de 15-20 caracteres y dominaban el ranking semántico de consultas en español por puro azar de embedding.
+- **Páginas de desambiguación**: identificadas por las plantillas `{{disambig}}`, `{{disambiguation}}`, `{{geodis}}`, `{{hndis}}` o `{{setindex}}`. Su cuerpo es una lista de enlaces, no descripción turística.
+- **Descripción muy corta**: tras limpiar el wikitexto, si el texto resultante tiene menos de `MIN_DESCRIPTION_CHARS` (200 caracteres) caracteres, el documento se descarta. Esta es la defensa de respaldo para artefactos de parseo y stubs que no encajan en los dos filtros anteriores.
+
+Estos casos no se "siguen" en la API. Wikipedia ES (a través del pipeline de expansión documentado más abajo) trae el destino real con contenido completo, por lo que no perdemos cobertura.
+
 #### Diagrama del Pipeline
 
 ```mermaid
