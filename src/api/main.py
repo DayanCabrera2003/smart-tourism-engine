@@ -251,6 +251,26 @@ def get_recommendation_service():
     return _default_recommendation_service()
 
 
+@lru_cache(maxsize=1)
+def _default_cross_encoder():
+    """Lazy singleton for the multilingual cross-encoder (T23).
+
+    Returns ``None`` if the package or weights cannot be loaded so the
+    optional rerank degrades gracefully without crashing the request.
+    """
+    try:
+        from src.retrieval.cross_encoder_reranker import CrossEncoderReranker
+
+        return CrossEncoderReranker()
+    except Exception:  # pragma: no cover - depends on user environment
+        return None
+
+
+def get_cross_encoder():
+    """Provee el cross-encoder. Inyectable en tests."""
+    return _default_cross_encoder()
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -305,6 +325,50 @@ def _maybe_rerank(
         return hits
     reranker = _build_reranker(destinations)
     return reranker.rerank(hits)
+
+
+def _maybe_cross_encode(
+    query: str,
+    hits: list[tuple[str, float]],
+    destinations: dict[str, dict[str, object]],
+    cross_encoder,
+    *,
+    enabled: bool,
+    top_n: int = 50,
+    blend: float = 0.5,
+) -> list[tuple[str, float]]:
+    """Cross-encoder rerank for the top ``top_n`` candidates.
+
+    The full query is paired with ``"{name}. {description[:512]}"`` for
+    each candidate. The cross-encoder returns a sigmoid-calibrated
+    score in ``[0, 1]`` which is **blended** with the bi-encoder
+    relevance (``blend`` controls the cross-encoder's weight; default
+    0.5 = equal mix). Pure replacement was tried first and was found to
+    degrade nDCG@10 on geographic queries because the multilingual
+    mMARCO cross-encoder does not consistently respect country intent
+    when the geo filter fails to match an adjective ("italianas" vs
+    "italy"). Blending keeps the bi-encoder's geographic signal while
+    letting the cross-encoder refine ties.
+    """
+    if not enabled or not hits or cross_encoder is None:
+        return hits
+    head = hits[:top_n]
+    tail = hits[top_n:]
+    candidates: list[tuple[str, str]] = []
+    for doc_id, _score in head:
+        meta = destinations.get(doc_id) or {}
+        name = str(meta.get("name") or doc_id)
+        desc = str(meta.get("description") or "")[:512]
+        text = f"{name}. {desc}" if desc else name
+        candidates.append((doc_id, text))
+    ce_scores = dict(cross_encoder.rerank(query, candidates))
+    blended: list[tuple[str, float]] = []
+    blend = max(0.0, min(1.0, blend))
+    for doc_id, bi_score in head:
+        ce = ce_scores.get(doc_id, 0.0)
+        blended.append((doc_id, (1.0 - blend) * bi_score + blend * ce))
+    blended.sort(key=lambda hit: hit[1], reverse=True)
+    return blended + tail
 
 
 def _build_destination_result(
@@ -377,6 +441,9 @@ EmbedderDep = Annotated[TextEmbedder, Depends(get_embedder)]
 SemanticCollectionDep = Annotated[str, Depends(get_semantic_collection)]
 
 
+CrossEncoderDep = Annotated[object, Depends(get_cross_encoder)]
+
+
 @app.post("/search/semantic", response_model=SearchResponse)
 def search_semantic(
     request: SemanticSearchRequest,
@@ -384,6 +451,7 @@ def search_semantic(
     embedder: EmbedderDep,
     collection: SemanticCollectionDep,
     destinations: DestinationsDep,
+    cross_encoder: CrossEncoderDep,
 ) -> SearchResponse:
     """Búsqueda semántica (T053): embebe la query y consulta Qdrant directamente.
 
@@ -420,6 +488,15 @@ def search_semantic(
         str(payload.get("slug") or point_id): payload
         for point_id, _score, payload in filtered
     }
+    # Cross-encoder runs first so its calibrated relevance feeds the
+    # popularity/freshness reranker downstream.
+    semantic_pairs = _maybe_cross_encode(
+        request.query,
+        semantic_pairs,
+        destinations,
+        cross_encoder,
+        enabled=request.use_cross_encoder,
+    )
     reranked = _maybe_rerank(
         semantic_pairs, destinations, enabled=request.use_reranker
     )
@@ -444,6 +521,7 @@ def search_hybrid(
     collection: SemanticCollectionDep,
     retriever_factory: RetrieverFactoryDep,
     destinations: DestinationsDep,
+    cross_encoder: CrossEncoderDep,
 ) -> SearchResponse:
     """Búsqueda híbrida (T055): Booleano Extendido + semántico con peso alpha.
 
@@ -468,8 +546,18 @@ def search_hybrid(
     filtered = apply_country_filter(
         hits_with_country, request.query, country_getter=lambda h: h[2]
     )
+    pairs = [(doc_id, score) for doc_id, score, _ in filtered]
+    # Cross-encoder runs first so its calibrated relevance feeds the
+    # popularity/freshness reranker downstream.
+    pairs = _maybe_cross_encode(
+        request.query,
+        pairs,
+        destinations,
+        cross_encoder,
+        enabled=request.use_cross_encoder,
+    )
     reranked = _maybe_rerank(
-        [(doc_id, score) for doc_id, score, _ in filtered],
+        pairs,
         destinations,
         enabled=request.use_reranker,
     )

@@ -136,6 +136,37 @@ def _build_reranker_from_destinations(
     return Reranker(popularity=popularity, freshness=freshness)
 
 
+def _cross_encode_pairs(
+    query: str,
+    pairs: list[tuple[str, float]],
+    destinations: dict[str, dict[str, object]],
+    cross_encoder,
+    *,
+    top_n: int = 50,
+    blend: float = 0.5,
+) -> list[tuple[str, float]]:
+    """Mirror of src.api.main._maybe_cross_encode (blended)."""
+    if not pairs or cross_encoder is None:
+        return pairs
+    head = pairs[:top_n]
+    tail = pairs[top_n:]
+    candidates: list[tuple[str, str]] = []
+    for doc_id, _score in head:
+        meta = destinations.get(doc_id) or {}
+        name = str(meta.get("name") or doc_id)
+        desc = str(meta.get("description") or "")[:512]
+        text = f"{name}. {desc}" if desc else name
+        candidates.append((doc_id, text))
+    ce_scores = dict(cross_encoder.rerank(query, candidates))
+    blended: list[tuple[str, float]] = []
+    blend_c = max(0.0, min(1.0, blend))
+    for doc_id, bi_score in head:
+        ce = ce_scores.get(doc_id, 0.0)
+        blended.append((doc_id, (1.0 - blend_c) * bi_score + blend_c * ce))
+    blended.sort(key=lambda hit: hit[1], reverse=True)
+    return blended + tail
+
+
 def make_boolean_runner(
     p: float = 2.0, use_reranker: bool = True
 ) -> Callable[[str], list[str]]:
@@ -170,7 +201,17 @@ def make_boolean_runner(
     return run
 
 
-def make_semantic_runner(use_reranker: bool = True) -> Callable[[str], list[str]]:
+def _build_cross_encoder_if_enabled(use_cross_encoder: bool):
+    if not use_cross_encoder:
+        return None
+    from src.retrieval.cross_encoder_reranker import CrossEncoderReranker
+
+    return CrossEncoderReranker()
+
+
+def make_semantic_runner(
+    use_reranker: bool = True, use_cross_encoder: bool = False
+) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
     from src.indexing.embedder import TextEmbedder
     from src.indexing.vector_store import VectorStore
@@ -180,6 +221,7 @@ def make_semantic_runner(use_reranker: bool = True) -> Callable[[str], list[str]
     store = VectorStore()
     destinations = _build_destinations_map()
     reranker = _build_reranker_from_destinations(destinations) if use_reranker else None
+    ce = _build_cross_encoder_if_enabled(use_cross_encoder)
 
     def run(query: str) -> list[str]:
         vector = embedder.embed(query, mode="query")
@@ -189,6 +231,7 @@ def make_semantic_runner(use_reranker: bool = True) -> Callable[[str], list[str]
             (str(payload.get("slug") or pid), float(score))
             for pid, score, payload in filtered
         ]
+        pairs = _cross_encode_pairs(query, pairs, destinations, ce)
         if reranker is not None and pairs:
             pairs = reranker.rerank(pairs)
         return [doc_id for doc_id, _ in pairs[:10]]
@@ -197,7 +240,10 @@ def make_semantic_runner(use_reranker: bool = True) -> Callable[[str], list[str]
 
 
 def make_hybrid_runner(
-    alpha: float = 0.5, p: float = 2.0, use_reranker: bool = True
+    alpha: float = 0.5,
+    p: float = 2.0,
+    use_reranker: bool = True,
+    use_cross_encoder: bool = False,
 ) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
     from src.indexing.embedder import TextEmbedder
@@ -221,6 +267,7 @@ def make_hybrid_runner(
         alpha=alpha,
     )
     reranker = _build_reranker_from_destinations(destinations) if use_reranker else None
+    ce = _build_cross_encoder_if_enabled(use_cross_encoder)
 
     def run(query: str) -> list[str]:
         hits = hybrid.search(query, index, top_k=200)
@@ -232,6 +279,7 @@ def make_hybrid_runner(
             hits_country, query, country_getter=lambda h: h[2]
         )
         pairs = [(doc_id, score) for doc_id, score, _ in filtered]
+        pairs = _cross_encode_pairs(query, pairs, destinations, ce)
         if reranker is not None and pairs:
             pairs = reranker.rerank(pairs)
         return [doc_id for doc_id, _ in pairs[:10]]
@@ -239,10 +287,22 @@ def make_hybrid_runner(
     return run
 
 
+def make_semantic_ce_runner() -> Callable[[str], list[str]]:
+    """Convenience runner: semantic + cross-encoder + reranker."""
+    return make_semantic_runner(use_reranker=True, use_cross_encoder=True)
+
+
+def make_hybrid_ce_runner() -> Callable[[str], list[str]]:
+    """Convenience runner: hybrid + cross-encoder + reranker."""
+    return make_hybrid_runner(use_reranker=True, use_cross_encoder=True)
+
+
 _RUNNERS: dict[str, Callable[[], Callable[[str], list[str]]]] = {
     "boolean": make_boolean_runner,
     "semantic": make_semantic_runner,
     "hybrid": make_hybrid_runner,
+    "semantic_ce": make_semantic_ce_runner,
+    "hybrid_ce": make_hybrid_ce_runner,
 }
 
 

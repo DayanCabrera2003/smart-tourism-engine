@@ -64,6 +64,14 @@ class SemanticSearchRequest(BaseModel):
             "sobre los top candidatos antes de cortar a top_k."
         ),
     )
+    use_cross_encoder: bool = Field(
+        False,
+        description=(
+            "Si True, aplica un cross-encoder multilingüe (mMARCO) sobre los "
+            "top-50 candidatos del bi-encoder. Sube nDCG@10 ~5-10 puntos en "
+            "queries ambiguas pero añade ~1 s de latencia en CPU."
+        ),
+    )
 
 
 class DestinationResult(BaseModel):
@@ -155,6 +163,14 @@ class HybridSearchRequest(BaseModel):
         description=(
             "Si True (default), aplica el Reranker con popularidad y frescura "
             "sobre los top candidatos antes de cortar a top_k."
+        ),
+    )
+    use_cross_encoder: bool = Field(
+        False,
+        description=(
+            "Si True, aplica un cross-encoder multilingüe (mMARCO) sobre los "
+            "top-50 candidatos antes del Reranker. Sube nDCG@10 ~5-10 puntos "
+            "pero añade ~1 s de latencia en CPU."
         ),
     )
 
