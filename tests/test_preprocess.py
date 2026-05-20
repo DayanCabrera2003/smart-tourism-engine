@@ -58,6 +58,12 @@ def test_preprocess_pipeline_order():
     assert "arte" in result  # "arte" no cambia con Snowball español
 
 
-def test_preprocess_numbers_preserved():
+def test_preprocess_drops_pure_digit_tokens():
+    # Pure-digit tokens (years, ratings, IDs) are stripped by the
+    # tokenizer because they bloat the vocabulary without adding any
+    # retrieval signal. Adjacent alphabetic tokens survive.
     result = preprocess("hotel 5 estrellas")
-    assert "5" in result
+    assert "5" not in result
+    assert "hotel" in result
+    # "estrellas" -> "estrell" with Snowball Spanish.
+    assert any(t.startswith("estrell") for t in result)

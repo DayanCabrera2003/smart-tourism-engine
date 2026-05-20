@@ -19,13 +19,17 @@ def tokenize(text: str) -> list[str]:
     1. Conversión a minúsculas.
     2. Eliminación de acentos/diacríticos.
     3. Split por caracteres no alfanuméricos.
-    4. Filtrado de tokens vacíos.
+    4. Filtrado de tokens vacíos, tokens de un solo carácter y tokens
+       puramente numéricos (años, identificadores de poca utilidad para
+       la recuperación de información turística).
 
     Args:
         text: Texto de entrada (puede contener texto normalizado o crudo).
 
     Returns:
-        Lista de tokens en minúsculas, sin acentos y sin puntuación.
+        Lista de tokens en minúsculas, sin acentos, sin puntuación y
+        sin tokens basura (cadenas de un solo carácter ni cadenas
+        formadas únicamente por dígitos).
     """
     if not text:
         return []
@@ -33,4 +37,4 @@ def tokenize(text: str) -> list[str]:
     text = text.lower()
     text = _strip_accents(text)
     tokens = re.split(r"[^a-z0-9]+", text)
-    return [t for t in tokens if t]
+    return [t for t in tokens if len(t) >= 2 and not t.isdigit()]

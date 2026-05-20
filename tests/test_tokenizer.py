@@ -13,14 +13,17 @@ def test_tokenize_empty():
 def test_tokenize_punctuation():
     assert tokenize("hola, mundo!") == ["hola", "mundo"]
     assert tokenize("¡España es bonita!") == ["espana", "es", "bonita"]
-    assert tokenize("un-guión y punto.final") == ["un", "guion", "y", "punto", "final"]
+    # Single-character "y" is dropped as junk (it is also a Spanish
+    # stopword, so removing it earlier saves work downstream).
+    assert tokenize("un-guión y punto.final") == ["un", "guion", "punto", "final"]
 
 
 def test_tokenize_accents():
     assert tokenize("España") == ["espana"]
     assert tokenize("árbol genealógico") == ["arbol", "genealogico"]
     assert tokenize("Ñoño") == ["nono"]
-    assert tokenize("ü ö ä") == ["u", "o", "a"]
+    # Single-character tokens are filtered out as junk.
+    assert tokenize("ü ö ä") == []
 
 
 def test_tokenize_uppercase():
@@ -30,12 +33,26 @@ def test_tokenize_uppercase():
 
 def test_tokenize_mixed_punctuation_and_accents():
     assert tokenize("¿Cómo está todo?") == ["como", "esta", "todo"]
-    assert tokenize("Café, té y más...") == ["cafe", "te", "y", "mas"]
+    # "y" is dropped as a single-character token.
+    assert tokenize("Café, té y más...") == ["cafe", "te", "mas"]
 
 
 def test_tokenize_numbers():
-    assert tokenize("hotel 5 estrellas") == ["hotel", "5", "estrellas"]
-    assert tokenize("año 2024") == ["ano", "2024"]
+    # Pure-digit tokens are dropped. They appear ~96 times in the legacy
+    # vocabulary (years, hotel ratings, etc.) but never serve as content
+    # signals for tourism retrieval.
+    assert tokenize("hotel 5 estrellas") == ["hotel", "estrellas"]
+    assert tokenize("año 2024") == ["ano"]
+
+
+def test_tokenize_keeps_alphanumeric_tokens():
+    # Tokens that mix letters and digits are not pure digits and stay.
+    assert tokenize("siglo XXI ruta66 año2024") == ["siglo", "xxi", "ruta66", "ano2024"]
+
+
+def test_tokenize_drops_single_char_tokens():
+    assert tokenize("a b c d") == []
+    assert tokenize("u-v-w") == []
 
 
 def test_tokenize_multiple_spaces():
