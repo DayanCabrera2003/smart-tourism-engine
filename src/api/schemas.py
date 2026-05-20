@@ -35,10 +35,12 @@ class SearchRequest(BaseModel):
         ),
     )
     use_reranker: bool = Field(
-        True,
+        False,
         description=(
-            "Si True (default), aplica el Reranker con popularidad y frescura "
-            "sobre los top candidatos antes de cortar a top_k."
+            "Si True, aplica el Reranker con popularidad y frescura sobre "
+            "los top candidatos antes de cortar a top_k. Default False: la "
+            "popularidad min-max-normalizada favorece descripciones largas "
+            "y degrada P@10 / nDCG@10 sobre el eval set v2."
         ),
     )
 
@@ -58,10 +60,11 @@ class SemanticSearchRequest(BaseModel):
         description="Número máximo de vecinos a devolver desde Qdrant.",
     )
     use_reranker: bool = Field(
-        True,
+        False,
         description=(
-            "Si True (default), aplica el Reranker con popularidad y frescura "
-            "sobre los top candidatos antes de cortar a top_k."
+            "Si True, aplica el Reranker con popularidad y frescura sobre "
+            "los top candidatos antes de cortar a top_k. Default False: el "
+            "denso ya ordena bien y la popularidad solo introduce ruido."
         ),
     )
     use_cross_encoder: bool = Field(
@@ -161,10 +164,12 @@ class HybridSearchRequest(BaseModel):
         description="Norma-p de la rama Booleana Extendida.",
     )
     use_reranker: bool = Field(
-        True,
+        False,
         description=(
-            "Si True (default), aplica el Reranker con popularidad y frescura "
-            "sobre los top candidatos antes de cortar a top_k."
+            "Si True, aplica el Reranker con popularidad y frescura sobre "
+            "los top candidatos antes de cortar a top_k. Default False: en "
+            "el modo híbrido el lado denso ya dominante, y la popularidad "
+            "degrada P@10 / nDCG@10 sobre el eval set v2."
         ),
     )
     use_cross_encoder: bool = Field(

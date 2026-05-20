@@ -40,7 +40,7 @@ def teardown_function() -> None:
 
 
 def test_reranker_promotes_more_popular_tie_breaker() -> None:
-    """Two docs tied on relevance: the more popular one wins."""
+    """Two docs tied on relevance: the more popular one wins when reranker on."""
     destinations = {
         "doc-popular": {
             "name": "Popular",
@@ -60,7 +60,11 @@ def test_reranker_promotes_more_popular_tie_breaker() -> None:
         },
     }
     client = _client(destinations=destinations)
-    response = client.post("/search", json={"query": "beach", "top_k": 2})
+    # Default is False; flip on explicitly for the tie-breaker test.
+    response = client.post(
+        "/search",
+        json={"query": "beach", "top_k": 2, "use_reranker": True},
+    )
     assert response.status_code == 200
     ids = [r["id"] for r in response.json()["results"]]
     assert ids == ["doc-popular", "doc-niche"]
@@ -98,8 +102,15 @@ def test_use_reranker_false_preserves_pure_relevance() -> None:
     assert results[0]["score"] == results[1]["score"]
 
 
-def test_reranker_default_is_enabled() -> None:
-    """A request without use_reranker must apply the reranker."""
+def test_reranker_default_is_disabled() -> None:
+    """A request without use_reranker leaves the retriever order intact.
+
+    The reranker degraded P@10/nDCG@10 on the v2 eval set against the
+    957-doc corpus, so the API default flipped to False. The two docs
+    have identical lexical relevance for 'beach'; without the reranker
+    the returned order matches the underlying retriever order (which
+    is currently doc-niche, doc-popular for this lexically-tied pair).
+    """
     destinations = {
         "doc-popular": {
             "name": "Popular",
@@ -120,5 +131,7 @@ def test_reranker_default_is_enabled() -> None:
     }
     client = _client(destinations=destinations)
     response = client.post("/search", json={"query": "beach", "top_k": 2})
-    ids = [r["id"] for r in response.json()["results"]]
-    assert ids[0] == "doc-popular"
+    results = response.json()["results"]
+    # Equal relevance, no reranker → both docs returned, scores equal.
+    assert len(results) == 2
+    assert results[0]["score"] == results[1]["score"]

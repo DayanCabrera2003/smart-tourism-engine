@@ -175,7 +175,7 @@ def _cross_encode_pairs(
 
 
 def make_boolean_runner(
-    p: float = 2.0, use_reranker: bool = True
+    p: float = 2.0, use_reranker: bool = False
 ) -> Callable[[str], list[str]]:
     from src.retrieval.extended_boolean import ExtendedBoolean
     from src.retrieval.geo_filter import apply_country_filter
@@ -217,7 +217,7 @@ def _build_cross_encoder_if_enabled(use_cross_encoder: bool):
 
 
 def make_semantic_runner(
-    use_reranker: bool = True, use_cross_encoder: bool = False
+    use_reranker: bool = False, use_cross_encoder: bool = False
 ) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
     from src.indexing.embedder import TextEmbedder
@@ -247,9 +247,9 @@ def make_semantic_runner(
 
 
 def make_hybrid_runner(
-    alpha: float = 0.5,
+    alpha: float = 0.3,
     p: float = 2.0,
-    use_reranker: bool = True,
+    use_reranker: bool = False,
     use_cross_encoder: bool = False,
 ) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
