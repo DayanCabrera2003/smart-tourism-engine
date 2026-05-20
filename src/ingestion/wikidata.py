@@ -85,14 +85,14 @@ SELECT DISTINCT
   ?article_es ?article_en
 WHERE {{
   VALUES ?type {{ {types} }}
-  ?item wdt:P31/wdt:P279* ?type .
+  ?item wdt:P31 ?type .
   ?item wdt:P17 ?country .
   ?country wdt:P297 "{country_code}" .
+  ?article_es schema:about ?item ;
+              schema:isPartOf <https://es.wikipedia.org/> .
   OPTIONAL {{ ?item wdt:P625 ?coord . }}
   OPTIONAL {{ ?item wdt:P18 ?image . }}
   OPTIONAL {{ ?item wdt:P1082 ?population . }}
-  ?article_es schema:about ?item ;
-              schema:isPartOf <https://es.wikipedia.org/> .
   OPTIONAL {{
     ?article_en schema:about ?item ;
                 schema:isPartOf <https://en.wikipedia.org/> .
