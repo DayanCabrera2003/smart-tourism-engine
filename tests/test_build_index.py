@@ -81,6 +81,53 @@ def test_build_index_missing_source_raises(tmp_path):
         build_index(tmp_path / "no_existe.jsonl", tmp_path / "index.pkl")
 
 
+def test_build_index_stems_documents_with_detected_language(tmp_path):
+    """A Spanish document must produce Spanish stems, English -> English.
+
+    Regression test for the bilingual indexing path: stemming
+    Spanish text with the English Snowball leaves words like
+    "histórico" unchanged, so the lexical index never matches the
+    Spanish-stemmed query stem "histor". With per-document language
+    detection both branches produce the same stem.
+    """
+    from src.indexing.inverted_index import InvertedIndex
+    from src.indexing.stemmer import stem_token
+
+    path = tmp_path / "bilingual.jsonl"
+    docs = [
+        {
+            "id": "doc-es",
+            "name": "Toledo",
+            "description_normalized": (
+                "toledo es una ciudad histórica famosa por su catedral "
+                "gótica y su patrimonio cultural medieval en el centro "
+                "de españa"
+            ),
+        },
+        {
+            "id": "doc-en",
+            "name": "York",
+            "description_normalized": (
+                "york is a historic walled city in northern england "
+                "famous for its medieval cathedral and roman heritage"
+            ),
+        },
+    ]
+    path.write_text("\n".join(json.dumps(d) for d in docs))
+
+    output = tmp_path / "index.pkl"
+    build_index(path, output)
+    idx = InvertedIndex.load(output)
+
+    # The Spanish doc must be reachable by the Spanish stem of "histórica".
+    es_stem = stem_token("histórica", language="spanish")
+    assert "doc-es" in {p[0] for p in idx.get_postings(es_stem)}
+
+    # The English doc must be reachable by the English stem of "historic".
+    en_stem = stem_token("historic", language="english")
+    assert "doc-en" in {p[0] for p in idx.get_postings(en_stem)}
+
+
 # ── CLI integration ──────────────────────────────────────────────────────────
 
 runner = CliRunner()

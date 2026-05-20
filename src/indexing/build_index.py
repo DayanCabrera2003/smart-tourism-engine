@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from src.indexing.inverted_index import InvertedIndex
+from src.indexing.language import detect_language
 from src.indexing.preprocess import preprocess
 from src.logging_config import logger
 
@@ -16,11 +17,16 @@ def build_index(source: str | Path, output: str | Path) -> int:
     Flujo:
         1. Lee cada línea de `source` como un objeto JSON con campos `id`,
            `name` y `description_normalized`.
-        2. Preprocesa el texto concatenado (nombre + descripción normalizada)
-           con el pipeline tokenize → stopwords → stem.
-        3. Indexa cada documento en `InvertedIndex`.
-        4. Calcula pesos TF-IDF y normas L2.
-        5. Serializa el índice en `output` con `InvertedIndex.save()`.
+        2. Detecta el idioma del texto (es / en) con
+           :func:`src.indexing.language.detect_language` para elegir el
+           Snowball correcto. Sin esta detección, documentos en español
+           se stemizan con reglas inglesas y los stems no encajan con
+           los que produce la query.
+        3. Preprocesa el texto concatenado (nombre + descripción
+           normalizada) con el pipeline tokenize → stopwords → stem.
+        4. Indexa cada documento en `InvertedIndex`.
+        5. Calcula pesos TF-IDF y normas L2.
+        6. Serializa el índice en `output` con `InvertedIndex.save()`.
 
     Args:
         source: Ruta al archivo JSONL de destinos procesados.
@@ -48,7 +54,8 @@ def build_index(source: str | Path, output: str | Path) -> int:
             doc = json.loads(line)
             doc_id: str = doc["id"]
             text: str = doc.get("name", "") + " " + doc.get("description_normalized", "")
-            tokens = preprocess(text, language="english")
+            language = detect_language(text)
+            tokens = preprocess(text, language=language)
             idx.add_document(doc_id, tokens)
 
     idx.compute_tf_idf()
