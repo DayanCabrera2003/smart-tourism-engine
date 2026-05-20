@@ -60,7 +60,7 @@ class _FakeEmbedder:
         self._vocab = vocab
         self._default_dim = default_dim
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "query") -> list[float]:
         if text in self._vocab:
             return list(self._vocab[text])
         return [0.0] * self._default_dim

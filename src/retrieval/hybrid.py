@@ -85,7 +85,11 @@ class HybridRetriever:
             lexical_hits = []
 
         if self.alpha < 1.0:
-            vector = self._embedder.embed(query)
+            # The dense branch always embeds the user's input as a query
+            # so that multilingual-e5-small applies the "query: " prefix.
+            # Without it, the cosine against passage-prefixed corpus
+            # vectors loses several MTEB points.
+            vector = self._embedder.embed(query, mode="query")
             for _point_id, score, payload in self._store.search(
                 self._collection, vector, top_k=fetch
             ):

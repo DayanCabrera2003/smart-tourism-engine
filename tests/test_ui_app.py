@@ -62,7 +62,7 @@ class _StubEmbedder:
         "mountain": [0.0, 1.0, 0.0, 0.0],
     }
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "query") -> list[float]:
         key = text.strip().lower()
         if key in self.VECTORS:
             return list(self.VECTORS[key])

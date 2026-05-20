@@ -14,7 +14,7 @@ class _CountingEmbedder:
     def __init__(self) -> None:
         self.call_count = 0
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "query") -> list[float]:
         self.call_count += 1
         return [float(ord(c)) for c in text[:4]]
 

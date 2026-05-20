@@ -350,7 +350,10 @@ def search_semantic(
     # nothing matching to keep.
     fetch_k = 200 if detect_countries(request.query) else max(request.top_k * 3, 30)
     try:
-        query_vector = embedder.embed(request.query)
+        # Explicit "query" mode prepends the prefix multilingual-e5-small
+        # expects for short user input; matches how the corpus was
+        # embedded with mode="passage".
+        query_vector = embedder.embed(request.query, mode="query")
         raw_hits = store.search(collection, query_vector, top_k=fetch_k)
     except Exception as exc:  # pragma: no cover - delegado a middleware
         raise HTTPException(

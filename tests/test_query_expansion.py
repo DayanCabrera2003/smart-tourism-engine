@@ -16,7 +16,7 @@ class _FakeEmbedder:
         self._vocab = vocab
         self._default_dim = default_dim
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "query") -> list[float]:
         if text in self._vocab:
             return list(self._vocab[text])
         return [0.0] * self._default_dim
@@ -121,7 +121,7 @@ def test_expand_query_uses_cache_to_avoid_re_embedding() -> None:
     calls: list[str] = []
 
     class _CountingEmbedder:
-        def embed(self, text: str) -> list[float]:
+        def embed(self, text: str, mode: str = "query") -> list[float]:
             calls.append(text)
             return {"playa": [1.0, 0.0], "beach": [0.99, 0.01]}.get(
                 text, [0.0, 0.0]

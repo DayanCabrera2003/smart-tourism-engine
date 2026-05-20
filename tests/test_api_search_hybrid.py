@@ -39,7 +39,8 @@ class _StubEmbedder:
         "mountain": [0.0, 1.0, 0.0, 0.0],
     }
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "query") -> list[float]:
+        del mode  # parity with the real embedder; ignored by the stub.
         key = text.strip().lower()
         if key in self.VECTORS:
             return list(self.VECTORS[key])

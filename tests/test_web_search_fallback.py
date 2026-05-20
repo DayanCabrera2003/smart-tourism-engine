@@ -14,7 +14,7 @@ COLLECTION = "test_fallback_col"
 
 
 class _StubEmbedder:
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "query") -> list[float]:
         raw = [float((ord(c) % 7) + 1) for c in (text or "x")[:DIM]]
         raw.extend([0.0] * (DIM - len(raw)))
         norm = math.sqrt(sum(v * v for v in raw)) or 1.0

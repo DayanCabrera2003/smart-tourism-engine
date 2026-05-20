@@ -11,7 +11,7 @@ class _FakeEmbedder:
     def __init__(self, vocab: dict[str, list[float]]):
         self._vocab = vocab
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "query") -> list[float]:
         return list(self._vocab[text])
 
 
