@@ -39,7 +39,8 @@ def test_embed_requests_normalized_vectors() -> None:
 
     vector = embedder.embed("hola")
 
-    assert stub.calls == [("hola", True)]
+    # The default mode is "query", so the prefix is applied transparently.
+    assert stub.calls == [("query: hola", True)]
     norm = math.sqrt(sum(v * v for v in vector))
     assert norm == 1.0 or math.isclose(norm, 1.0, abs_tol=1e-6)
 
