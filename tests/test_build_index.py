@@ -81,14 +81,15 @@ def test_build_index_missing_source_raises(tmp_path):
         build_index(tmp_path / "no_existe.jsonl", tmp_path / "index.pkl")
 
 
-def test_build_index_stems_documents_with_detected_language(tmp_path):
-    """A Spanish document must produce Spanish stems, English -> English.
+def test_build_index_dual_stems_every_document(tmp_path):
+    """Every doc is indexed under the union of Spanish and English stems.
 
-    Regression test for the bilingual indexing path: stemming
-    Spanish text with the English Snowball leaves words like
-    "histórico" unchanged, so the lexical index never matches the
-    Spanish-stemmed query stem "histor". With per-document language
-    detection both branches produce the same stem.
+    Regression for the cross-language proper-name miss: a query "Madrid"
+    stemmed with Spanish Snowball produces "madr"; the doc "Madrid is
+    Spain's capital..." stemmed only with English Snowball would
+    produce "madrid" and miss "madr". With dual-stem indexing both
+    forms live in the same postings list and either query language
+    resolves the doc.
     """
     from src.indexing.inverted_index import InvertedIndex
     from src.indexing.stemmer import stem_token
@@ -106,10 +107,11 @@ def test_build_index_stems_documents_with_detected_language(tmp_path):
         },
         {
             "id": "doc-en",
-            "name": "York",
+            "name": "Madrid",
             "description_normalized": (
-                "york is a historic walled city in northern england "
-                "famous for its medieval cathedral and roman heritage"
+                "madrid is spain's capital and largest city with world "
+                "class museums and an extensive metro system loved by "
+                "tourists from across the globe"
             ),
         },
     ]
@@ -119,13 +121,20 @@ def test_build_index_stems_documents_with_detected_language(tmp_path):
     build_index(path, output)
     idx = InvertedIndex.load(output)
 
-    # The Spanish doc must be reachable by the Spanish stem of "histórica".
-    es_stem = stem_token("histórica", language="spanish")
-    assert "doc-es" in {p[0] for p in idx.get_postings(es_stem)}
+    # The Spanish doc must be reachable by the Spanish stem of "histórica"
+    # AND by the English stem of "historic" because dual-stem indexing
+    # union covers both.
+    es_hist = stem_token("histórica", language="spanish")
+    en_hist = stem_token("historic", language="english")
+    assert "doc-es" in {p[0] for p in idx.get_postings(es_hist)}
+    assert "doc-es" in {p[0] for p in idx.get_postings(en_hist)}
 
-    # The English doc must be reachable by the English stem of "historic".
-    en_stem = stem_token("historic", language="english")
-    assert "doc-en" in {p[0] for p in idx.get_postings(en_stem)}
+    # The English doc (Madrid) must be reachable by Spanish stem of
+    # "Madrid" ("madr") and the English stem ("madrid") alike.
+    es_madrid = stem_token("madrid", language="spanish")
+    en_madrid = stem_token("madrid", language="english")
+    assert "doc-en" in {p[0] for p in idx.get_postings(es_madrid)}
+    assert "doc-en" in {p[0] for p in idx.get_postings(en_madrid)}
 
 
 # ── CLI integration ──────────────────────────────────────────────────────────

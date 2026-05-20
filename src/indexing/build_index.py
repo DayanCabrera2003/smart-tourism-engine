@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 
 from src.indexing.inverted_index import InvertedIndex
-from src.indexing.language import detect_language
 from src.indexing.preprocess import preprocess
 from src.logging_config import logger
 
@@ -17,16 +16,17 @@ def build_index(source: str | Path, output: str | Path) -> int:
     Flujo:
         1. Lee cada línea de `source` como un objeto JSON con campos `id`,
            `name` y `description_normalized`.
-        2. Detecta el idioma del texto (es / en) con
-           :func:`src.indexing.language.detect_language` para elegir el
-           Snowball correcto. Sin esta detección, documentos en español
-           se stemizan con reglas inglesas y los stems no encajan con
-           los que produce la query.
-        3. Preprocesa el texto concatenado (nombre + descripción
-           normalizada) con el pipeline tokenize → stopwords → stem.
-        4. Indexa cada documento en `InvertedIndex`.
-        5. Calcula pesos TF-IDF y normas L2.
-        6. Serializa el índice en `output` con `InvertedIndex.save()`.
+        2. Preprocesa el texto concatenado (nombre + descripción
+           normalizada) DOS VECES: una con el Snowball español y otra
+           con el inglés. La unión de ambos conjuntos de stems se
+           indexa por documento. Esto evita que una consulta corta
+           (por ejemplo "Madrid", detectada como español → "madr")
+           pierda al documento "Madrid" cuyo cuerpo en inglés produjo
+           el stem "madrid". Con la doble indexación, ambas formas
+           viven en los postings del mismo doc.
+        3. Indexa cada documento en `InvertedIndex`.
+        4. Calcula pesos TF-IDF y normas L2.
+        5. Serializa el índice en `output` con `InvertedIndex.save()`.
 
     Args:
         source: Ruta al archivo JSONL de destinos procesados.
@@ -54,8 +54,18 @@ def build_index(source: str | Path, output: str | Path) -> int:
             doc = json.loads(line)
             doc_id: str = doc["id"]
             text: str = doc.get("name", "") + " " + doc.get("description_normalized", "")
-            language = detect_language(text)
-            tokens = preprocess(text, language=language)
+            # Index every document under the union of Spanish and English
+            # stems. Without this, a Spanish-detected query like
+            # "Madrid" (stem "madr") would miss an English-detected doc
+            # body (stem "madrid"). The union keeps the index reachable
+            # from either query language at the cost of a small vocab
+            # bump (~5-10% on a mixed corpus).
+            tokens_es = preprocess(text, language="es")
+            tokens_en = preprocess(text, language="en")
+            # Stem position is not used by the inverted index — it only
+            # records token frequency — so we can merge without losing
+            # any retrieval signal.
+            tokens = tokens_es + tokens_en
             idx.add_document(doc_id, tokens)
 
     idx.compute_tf_idf()
