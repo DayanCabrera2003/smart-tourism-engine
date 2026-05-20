@@ -1,6 +1,7 @@
 """T035 — Tests del parser de queries para el Modelo Booleano Extendido."""
 import pytest
 
+from src.indexing.stemmer import stem_token
 from src.retrieval.query_parser import AndNode, OrNode, TermNode, parse_query
 
 # ── Consultas de un solo término ──────────────────────────────────────────────
@@ -129,3 +130,34 @@ def test_stopword_only_term_in_and_raises():
     # 'the' se elimina → queda sólo 'beach'
     assert isinstance(node, TermNode)
     assert node.term == "beach"
+
+
+# ── Detección de idioma de la consulta ────────────────────────────────────────
+
+def test_spanish_query_uses_spanish_stemmer():
+    """Una consulta en español debe stemizarse con Snowball español."""
+    node = parse_query("ciudades históricas")
+    # "ciudades" no es stopword en NLTK Spanish; debe sobrevivir.
+    # Debe coincidir con el stem español, NO con el inglés.
+    assert isinstance(node, AndNode)
+    stems = {child.term for child in node.children if isinstance(child, TermNode)}
+    es_stem_ciudades = stem_token("ciudades", language="spanish")
+    assert es_stem_ciudades in stems
+
+
+def test_english_query_uses_english_stemmer():
+    node = parse_query("historic cities")
+    assert isinstance(node, AndNode)
+    stems = {child.term for child in node.children if isinstance(child, TermNode)}
+    en_stem_historic = stem_token("historic", language="english")
+    assert en_stem_historic in stems
+
+
+def test_query_with_accented_spanish_term_uses_spanish_stemmer():
+    """The accented form is what disambiguates the language."""
+    node = parse_query("destinos históricos")
+    assert isinstance(node, AndNode)
+    stems = {child.term for child in node.children if isinstance(child, TermNode)}
+    # Spanish stem of "históricos" → "histor"; English Snowball on
+    # the accent-stripped "historicos" would leave it intact.
+    assert "histor" in stems

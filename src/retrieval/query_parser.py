@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from src.indexing.language import detect_language
 from src.indexing.preprocess import preprocess
 
 __all__ = ["AndNode", "Node", "OrNode", "TermNode", "parse_query"]
@@ -73,12 +74,17 @@ def parse_query(query: str) -> Node:
     if not query:
         raise ValueError("La consulta no puede estar vacía.")
 
+    # Detect the language on the *full* query before splitting on
+    # operators. Detecting word-by-word is unreliable on 2-5 character
+    # tokens, so we resolve language once and propagate it down.
+    language = detect_language(query)
+
     tokens = query.split()
     and_groups = _split_by_or(tokens)
 
     or_children: list[Node] = []
     for group in and_groups:
-        node = _parse_and_group(group)
+        node = _parse_and_group(group, language)
         if node is not None:
             or_children.append(node)
 
@@ -104,15 +110,19 @@ def _split_by_or(tokens: list[str]) -> list[list[str]]:
     return groups
 
 
-def _parse_and_group(tokens: list[str]) -> Node | None:
-    """Parsea un grupo AND: ``term1 AND term2 AND term3``."""
+def _parse_and_group(tokens: list[str], language: str) -> Node | None:
+    """Parsea un grupo AND: ``term1 AND term2 AND term3``.
+
+    ``language`` selecciona el Snowball que aplicará el stem; se resuelve
+    una vez en :func:`parse_query` a partir de la consulta completa.
+    """
     # Filtrar el token "AND" y obtener los términos
     raw_terms = [tok for tok in tokens if tok != _AND]
     stems: list[str] = []
     for raw in raw_terms:
         if raw in _OPERATORS:
             continue
-        processed = preprocess(raw, language="english")
+        processed = preprocess(raw, language=language)
         stems.extend(processed)
 
     if not stems:
