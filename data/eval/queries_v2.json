@@ -1,0 +1,876 @@
+{
+  "metadata": {
+    "version": "2.0",
+    "total_queries": 45,
+    "annotation_methodology": "Ground truth derivado por reglas objetivas (id, country, keyword, keyword_in_country, regional union). El corpus actual (179 destinos) no contiene #REDIRECT ni paginas de desambiguacion tras la limpieza del bloque A, por lo que las listas relevantes ya no se ven contaminadas por stubs.",
+    "review_status": "rules_only_first_pass",
+    "corpus_size": 179
+  },
+  "queries": [
+    {
+      "id": "q01",
+      "query": "Madrid",
+      "language": "es",
+      "annotation_rule": "id=wikivoyage-madrid",
+      "relevant": [
+        "wikivoyage-madrid"
+      ],
+      "relevant_count": 1
+    },
+    {
+      "id": "q02",
+      "query": "Tokio",
+      "language": "es",
+      "annotation_rule": "id=wikivoyage-tokyo",
+      "relevant": [
+        "wikivoyage-tokyo"
+      ],
+      "relevant_count": 1
+    },
+    {
+      "id": "q03",
+      "query": "Cuzco / Machu Picchu en Peru",
+      "language": "es",
+      "annotation_rule": "country=Peru",
+      "relevant": [
+        "wikivoyage-arequipa",
+        "wikivoyage-lima",
+        "wikivoyage-machu-picchu"
+      ],
+      "relevant_count": 3
+    },
+    {
+      "id": "q04",
+      "query": "ciudades en España",
+      "language": "es",
+      "annotation_rule": "country=Spain",
+      "relevant": [
+        "wikivoyage-albacete",
+        "wikivoyage-alcala-de-henares",
+        "wikivoyage-alicante",
+        "wikivoyage-badajoz",
+        "wikivoyage-barcelona",
+        "wikivoyage-bilbao",
+        "wikivoyage-caceres",
+        "wikivoyage-ciudad-real",
+        "wikivoyage-girona",
+        "wikivoyage-granada",
+        "wikivoyage-huelva",
+        "wikivoyage-ibiza",
+        "wikivoyage-jerez-de-la-frontera",
+        "wikivoyage-lleida",
+        "wikivoyage-logrono",
+        "wikivoyage-lugo",
+        "wikivoyage-madrid",
+        "wikivoyage-ourense",
+        "wikivoyage-oviedo",
+        "wikivoyage-palma-de-mallorca",
+        "wikivoyage-pamplona",
+        "wikivoyage-pontevedra",
+        "wikivoyage-salamanca",
+        "wikivoyage-santa-cruz-de-tenerife",
+        "wikivoyage-santander",
+        "wikivoyage-santiago-de-compostela",
+        "wikivoyage-segovia",
+        "wikivoyage-seville",
+        "wikivoyage-soria",
+        "wikivoyage-tarragona",
+        "wikivoyage-teruel",
+        "wikivoyage-toledo",
+        "wikivoyage-valencia",
+        "wikivoyage-vitoria-gasteiz",
+        "wikivoyage-zaragoza"
+      ],
+      "relevant_count": 35
+    },
+    {
+      "id": "q05",
+      "query": "destinos en Francia",
+      "language": "es",
+      "annotation_rule": "country=France",
+      "relevant": [
+        "wikivoyage-aix-en-provence",
+        "wikivoyage-avignon",
+        "wikivoyage-biarritz",
+        "wikivoyage-bordeaux",
+        "wikivoyage-cannes",
+        "wikivoyage-dijon",
+        "wikivoyage-grenoble",
+        "wikivoyage-lille",
+        "wikivoyage-lyon",
+        "wikivoyage-marseille",
+        "wikivoyage-montpellier",
+        "wikivoyage-nantes",
+        "wikivoyage-nice",
+        "wikivoyage-paris",
+        "wikivoyage-perpignan",
+        "wikivoyage-reims",
+        "wikivoyage-rennes",
+        "wikivoyage-saint-tropez",
+        "wikivoyage-strasbourg",
+        "wikivoyage-toulouse"
+      ],
+      "relevant_count": 20
+    },
+    {
+      "id": "q06",
+      "query": "ciudades italianas",
+      "language": "es",
+      "annotation_rule": "country=Italy",
+      "relevant": [
+        "wikivoyage-amalfi",
+        "wikivoyage-bergamo",
+        "wikivoyage-bologna",
+        "wikivoyage-capri",
+        "wikivoyage-catania",
+        "wikivoyage-cinque-terre",
+        "wikivoyage-florence",
+        "wikivoyage-genoa",
+        "wikivoyage-milan",
+        "wikivoyage-naples",
+        "wikivoyage-padua",
+        "wikivoyage-palermo",
+        "wikivoyage-pisa",
+        "wikivoyage-ravenna",
+        "wikivoyage-rome",
+        "wikivoyage-siena",
+        "wikivoyage-trieste",
+        "wikivoyage-turin",
+        "wikivoyage-venice",
+        "wikivoyage-verona"
+      ],
+      "relevant_count": 20
+    },
+    {
+      "id": "q07",
+      "query": "destinos en Japón",
+      "language": "es",
+      "annotation_rule": "country=Japan",
+      "relevant": [
+        "wikivoyage-hiroshima",
+        "wikivoyage-kyoto",
+        "wikivoyage-nara",
+        "wikivoyage-osaka",
+        "wikivoyage-tokyo"
+      ],
+      "relevant_count": 5
+    },
+    {
+      "id": "q08",
+      "query": "ciudades de Alemania",
+      "language": "es",
+      "annotation_rule": "country=Germany",
+      "relevant": [
+        "wikivoyage-berlin",
+        "wikivoyage-bremen",
+        "wikivoyage-cologne",
+        "wikivoyage-dresden",
+        "wikivoyage-frankfurt",
+        "wikivoyage-freiburg",
+        "wikivoyage-hamburg",
+        "wikivoyage-heidelberg",
+        "wikivoyage-leipzig",
+        "wikivoyage-munich",
+        "wikivoyage-nuremberg",
+        "wikivoyage-potsdam",
+        "wikivoyage-rothenburg-ob-der-tauber",
+        "wikivoyage-stuttgart"
+      ],
+      "relevant_count": 14
+    },
+    {
+      "id": "q09",
+      "query": "destinos en Reino Unido",
+      "language": "es",
+      "annotation_rule": "country=United Kingdom",
+      "relevant": [
+        "wikivoyage-bath",
+        "wikivoyage-brighton",
+        "wikivoyage-bristol",
+        "wikivoyage-cambridge",
+        "wikivoyage-cardiff",
+        "wikivoyage-edinburgh",
+        "wikivoyage-glasgow",
+        "wikivoyage-liverpool",
+        "wikivoyage-london",
+        "wikivoyage-manchester",
+        "wikivoyage-oxford",
+        "wikivoyage-stonehenge",
+        "wikivoyage-york"
+      ],
+      "relevant_count": 13
+    },
+    {
+      "id": "q10",
+      "query": "destinos en China",
+      "language": "es",
+      "annotation_rule": "country=China",
+      "relevant": [
+        "wikivoyage-beijing",
+        "wikivoyage-guilin",
+        "wikivoyage-hong-kong",
+        "wikivoyage-shanghai",
+        "wikivoyage-xian"
+      ],
+      "relevant_count": 5
+    },
+    {
+      "id": "q11",
+      "query": "destinos en Cuba",
+      "language": "es",
+      "annotation_rule": "country=Cuba",
+      "relevant": [
+        "wikivoyage-havana",
+        "wikivoyage-trinidad",
+        "wikivoyage-varadero"
+      ],
+      "relevant_count": 3
+    },
+    {
+      "id": "q12",
+      "query": "destinos en Marruecos",
+      "language": "es",
+      "annotation_rule": "country=Morocco",
+      "relevant": [
+        "wikivoyage-casablanca",
+        "wikivoyage-fez",
+        "wikivoyage-marrakech"
+      ],
+      "relevant_count": 3
+    },
+    {
+      "id": "q13",
+      "query": "ciudades con playas",
+      "language": "es",
+      "annotation_rule": "keyword_any=beach,beaches",
+      "relevant": [
+        "wikivoyage-abu-dhabi",
+        "wikivoyage-alicante",
+        "wikivoyage-bali",
+        "wikivoyage-barcelona",
+        "wikivoyage-bilbao",
+        "wikivoyage-busan",
+        "wikivoyage-chicago",
+        "wikivoyage-florianopolis",
+        "wikivoyage-girona",
+        "wikivoyage-honolulu",
+        "wikivoyage-ibiza",
+        "wikivoyage-manuel-antonio",
+        "wikivoyage-montpellier",
+        "wikivoyage-perpignan",
+        "wikivoyage-punta-cana",
+        "wikivoyage-rio-de-janeiro",
+        "wikivoyage-salvador",
+        "wikivoyage-san-juan",
+        "wikivoyage-santander",
+        "wikivoyage-santiago",
+        "wikivoyage-sydney",
+        "wikivoyage-tarragona",
+        "wikivoyage-trinidad",
+        "wikivoyage-tunis",
+        "wikivoyage-valencia",
+        "wikivoyage-vancouver",
+        "wikivoyage-varadero",
+        "wikivoyage-zanzibar"
+      ],
+      "relevant_count": 28
+    },
+    {
+      "id": "q14",
+      "query": "destinos de montaña",
+      "language": "es",
+      "annotation_rule": "keyword=mountain",
+      "relevant": [
+        "wikivoyage-alicante",
+        "wikivoyage-cape-town",
+        "wikivoyage-grenoble",
+        "wikivoyage-lima",
+        "wikivoyage-manuel-antonio",
+        "wikivoyage-mendoza",
+        "wikivoyage-perpignan",
+        "wikivoyage-rio-de-janeiro",
+        "wikivoyage-trinidad"
+      ],
+      "relevant_count": 9
+    },
+    {
+      "id": "q15",
+      "query": "museos y galerías",
+      "language": "es",
+      "annotation_rule": "keyword=museum",
+      "relevant": [
+        "wikivoyage-cairo",
+        "wikivoyage-edinburgh",
+        "wikivoyage-munich",
+        "wikivoyage-xian",
+        "wikivoyage-york"
+      ],
+      "relevant_count": 5
+    },
+    {
+      "id": "q16",
+      "query": "ciudades históricas",
+      "language": "es",
+      "annotation_rule": "keyword_any=historic,historical",
+      "relevant": [
+        "wikivoyage-albacete",
+        "wikivoyage-alicante",
+        "wikivoyage-avignon",
+        "wikivoyage-bali",
+        "wikivoyage-barcelona",
+        "wikivoyage-bath",
+        "wikivoyage-beijing",
+        "wikivoyage-bologna",
+        "wikivoyage-bristol",
+        "wikivoyage-buenos-aires",
+        "wikivoyage-cairo",
+        "wikivoyage-dijon",
+        "wikivoyage-dresden",
+        "wikivoyage-edinburgh",
+        "wikivoyage-freiburg",
+        "wikivoyage-genoa",
+        "wikivoyage-guatemala-city",
+        "wikivoyage-honolulu",
+        "wikivoyage-huelva",
+        "wikivoyage-ibiza",
+        "wikivoyage-jaipur",
+        "wikivoyage-jerusalem",
+        "wikivoyage-lille",
+        "wikivoyage-liverpool",
+        "wikivoyage-london",
+        "wikivoyage-marrakech",
+        "wikivoyage-milan",
+        "wikivoyage-montevideo",
+        "wikivoyage-munich",
+        "wikivoyage-naples",
+        "wikivoyage-nara",
+        "wikivoyage-pamplona",
+        "wikivoyage-panama-city",
+        "wikivoyage-paris",
+        "wikivoyage-quebec-city",
+        "wikivoyage-rome",
+        "wikivoyage-salvador",
+        "wikivoyage-san-juan",
+        "wikivoyage-santander",
+        "wikivoyage-santo-domingo",
+        "wikivoyage-shanghai",
+        "wikivoyage-siena",
+        "wikivoyage-strasbourg",
+        "wikivoyage-sucre",
+        "wikivoyage-toledo",
+        "wikivoyage-verona",
+        "wikivoyage-xian",
+        "wikivoyage-york"
+      ],
+      "relevant_count": 48
+    },
+    {
+      "id": "q17",
+      "query": "catedrales y arquitectura medieval",
+      "language": "es",
+      "annotation_rule": "keyword_any=cathedral,medieval",
+      "relevant": [
+        "wikivoyage-alcala-de-henares",
+        "wikivoyage-avignon",
+        "wikivoyage-barcelona",
+        "wikivoyage-bath",
+        "wikivoyage-bergamo",
+        "wikivoyage-berlin",
+        "wikivoyage-bremen",
+        "wikivoyage-bristol",
+        "wikivoyage-cairo",
+        "wikivoyage-cologne",
+        "wikivoyage-edinburgh",
+        "wikivoyage-fez",
+        "wikivoyage-freiburg",
+        "wikivoyage-girona",
+        "wikivoyage-guadalajara",
+        "wikivoyage-istanbul",
+        "wikivoyage-jerez-de-la-frontera",
+        "wikivoyage-milan",
+        "wikivoyage-nuremberg",
+        "wikivoyage-ourense",
+        "wikivoyage-oviedo",
+        "wikivoyage-oxford",
+        "wikivoyage-palermo",
+        "wikivoyage-palma-de-mallorca",
+        "wikivoyage-pamplona",
+        "wikivoyage-reims",
+        "wikivoyage-rennes",
+        "wikivoyage-rothenburg-ob-der-tauber",
+        "wikivoyage-salamanca",
+        "wikivoyage-santiago-de-compostela",
+        "wikivoyage-segovia",
+        "wikivoyage-siena",
+        "wikivoyage-tarragona",
+        "wikivoyage-toledo",
+        "wikivoyage-toulouse",
+        "wikivoyage-vitoria-gasteiz",
+        "wikivoyage-york"
+      ],
+      "relevant_count": 37
+    },
+    {
+      "id": "q18",
+      "query": "regiones vinícolas",
+      "language": "es",
+      "annotation_rule": "keyword=wine",
+      "relevant": [
+        "wikivoyage-alicante",
+        "wikivoyage-bordeaux",
+        "wikivoyage-dijon",
+        "wikivoyage-logrono",
+        "wikivoyage-mendoza",
+        "wikivoyage-palermo",
+        "wikivoyage-reims",
+        "wikivoyage-santiago"
+      ],
+      "relevant_count": 8
+    },
+    {
+      "id": "q19",
+      "query": "destinos en el desierto",
+      "language": "es",
+      "annotation_rule": "keyword=desert",
+      "relevant": [
+        "wikivoyage-dubai",
+        "wikivoyage-jaipur",
+        "wikivoyage-marrakech",
+        "wikivoyage-mendoza"
+      ],
+      "relevant_count": 4
+    },
+    {
+      "id": "q20",
+      "query": "islas turísticas",
+      "language": "es",
+      "annotation_rule": "keyword=island",
+      "relevant": [
+        "wikivoyage-auckland",
+        "wikivoyage-bali",
+        "wikivoyage-cairo",
+        "wikivoyage-capri",
+        "wikivoyage-florianopolis",
+        "wikivoyage-hamburg",
+        "wikivoyage-honolulu",
+        "wikivoyage-ibiza",
+        "wikivoyage-melbourne",
+        "wikivoyage-mumbai",
+        "wikivoyage-new-york-city",
+        "wikivoyage-palermo",
+        "wikivoyage-palma-de-mallorca",
+        "wikivoyage-phuket",
+        "wikivoyage-santa-cruz-de-tenerife",
+        "wikivoyage-santo-domingo",
+        "wikivoyage-singapore",
+        "wikivoyage-trinidad",
+        "wikivoyage-varadero",
+        "wikivoyage-zanzibar"
+      ],
+      "relevant_count": 20
+    },
+    {
+      "id": "q21",
+      "query": "destinos para vida nocturna",
+      "language": "es",
+      "annotation_rule": "keyword=nightlife",
+      "relevant": [
+        "wikivoyage-bangkok",
+        "wikivoyage-barcelona",
+        "wikivoyage-buenos-aires",
+        "wikivoyage-cannes",
+        "wikivoyage-casablanca",
+        "wikivoyage-catania",
+        "wikivoyage-dublin",
+        "wikivoyage-granada",
+        "wikivoyage-hiroshima",
+        "wikivoyage-leipzig",
+        "wikivoyage-lille",
+        "wikivoyage-liverpool",
+        "wikivoyage-london",
+        "wikivoyage-madrid",
+        "wikivoyage-milan",
+        "wikivoyage-osaka",
+        "wikivoyage-rome",
+        "wikivoyage-seoul",
+        "wikivoyage-seville",
+        "wikivoyage-singapore"
+      ],
+      "relevant_count": 20
+    },
+    {
+      "id": "q22",
+      "query": "arte y cultura",
+      "language": "es",
+      "annotation_rule": "keyword=art",
+      "relevant": [
+        "wikivoyage-bergamo",
+        "wikivoyage-chicago",
+        "wikivoyage-florence",
+        "wikivoyage-london",
+        "wikivoyage-madrid",
+        "wikivoyage-milan",
+        "wikivoyage-munich",
+        "wikivoyage-new-york-city",
+        "wikivoyage-paris",
+        "wikivoyage-reims",
+        "wikivoyage-shanghai",
+        "wikivoyage-siena",
+        "wikivoyage-sydney",
+        "wikivoyage-trieste"
+      ],
+      "relevant_count": 14
+    },
+    {
+      "id": "q23",
+      "query": "gastronomía y comida típica",
+      "language": "es",
+      "annotation_rule": "keyword=food",
+      "relevant": [
+        "wikivoyage-bologna",
+        "wikivoyage-caracas",
+        "wikivoyage-london",
+        "wikivoyage-marrakech",
+        "wikivoyage-new-york-city",
+        "wikivoyage-osaka",
+        "wikivoyage-palermo",
+        "wikivoyage-paris",
+        "wikivoyage-seoul",
+        "wikivoyage-singapore",
+        "wikivoyage-vancouver"
+      ],
+      "relevant_count": 11
+    },
+    {
+      "id": "q24",
+      "query": "ciudades coloniales en México",
+      "language": "es",
+      "annotation_rule": "keyword_in_country=Mexico|colonial",
+      "relevant": [
+        "wikivoyage-guadalajara"
+      ],
+      "relevant_count": 1
+    },
+    {
+      "id": "q25",
+      "query": "playas en España",
+      "language": "es",
+      "annotation_rule": "keyword_in_country=Spain|beach,beaches",
+      "relevant": [
+        "wikivoyage-alicante",
+        "wikivoyage-barcelona",
+        "wikivoyage-bilbao",
+        "wikivoyage-girona",
+        "wikivoyage-ibiza",
+        "wikivoyage-santander",
+        "wikivoyage-tarragona",
+        "wikivoyage-valencia"
+      ],
+      "relevant_count": 8
+    },
+    {
+      "id": "q26",
+      "query": "ciudades históricas en Italia",
+      "language": "es",
+      "annotation_rule": "keyword_in_country=Italy|historic,historical",
+      "relevant": [
+        "wikivoyage-bologna",
+        "wikivoyage-genoa",
+        "wikivoyage-milan",
+        "wikivoyage-naples",
+        "wikivoyage-rome",
+        "wikivoyage-siena",
+        "wikivoyage-verona"
+      ],
+      "relevant_count": 7
+    },
+    {
+      "id": "q27",
+      "query": "islas en el Caribe",
+      "language": "es",
+      "annotation_rule": "caribbean_islands",
+      "relevant": [
+        "wikivoyage-havana",
+        "wikivoyage-punta-cana",
+        "wikivoyage-san-juan",
+        "wikivoyage-santo-domingo",
+        "wikivoyage-trinidad",
+        "wikivoyage-varadero"
+      ],
+      "relevant_count": 6
+    },
+    {
+      "id": "q28",
+      "query": "destinos en Sudamérica",
+      "language": "es",
+      "annotation_rule": "south_america_union",
+      "relevant": [
+        "wikivoyage-arequipa",
+        "wikivoyage-buenos-aires",
+        "wikivoyage-caracas",
+        "wikivoyage-florianopolis",
+        "wikivoyage-galapagos-islands",
+        "wikivoyage-la-paz",
+        "wikivoyage-lima",
+        "wikivoyage-machu-picchu",
+        "wikivoyage-mendoza",
+        "wikivoyage-montevideo",
+        "wikivoyage-quito",
+        "wikivoyage-rio-de-janeiro",
+        "wikivoyage-salta",
+        "wikivoyage-salvador",
+        "wikivoyage-santiago",
+        "wikivoyage-sucre"
+      ],
+      "relevant_count": 16
+    },
+    {
+      "id": "q29",
+      "query": "destinos en Asia",
+      "language": "es",
+      "annotation_rule": "asia_union",
+      "relevant": [
+        "wikivoyage-bali",
+        "wikivoyage-bangkok",
+        "wikivoyage-beijing",
+        "wikivoyage-busan",
+        "wikivoyage-chiang-mai",
+        "wikivoyage-guilin",
+        "wikivoyage-hanoi",
+        "wikivoyage-hiroshima",
+        "wikivoyage-ho-chi-minh-city",
+        "wikivoyage-hoi-an",
+        "wikivoyage-hong-kong",
+        "wikivoyage-jaipur",
+        "wikivoyage-kyoto",
+        "wikivoyage-mumbai",
+        "wikivoyage-nara",
+        "wikivoyage-osaka",
+        "wikivoyage-phuket",
+        "wikivoyage-seoul",
+        "wikivoyage-shanghai",
+        "wikivoyage-singapore",
+        "wikivoyage-tokyo",
+        "wikivoyage-xian",
+        "wikivoyage-yogyakarta"
+      ],
+      "relevant_count": 23
+    },
+    {
+      "id": "q30",
+      "query": "capitales europeas",
+      "language": "es",
+      "annotation_rule": "european_capitals_manual",
+      "relevant": [
+        "wikivoyage-madrid",
+        "wikivoyage-paris",
+        "wikivoyage-rome",
+        "wikivoyage-london",
+        "wikivoyage-berlin",
+        "wikivoyage-dublin",
+        "wikivoyage-edinburgh"
+      ],
+      "relevant_count": 7
+    },
+    {
+      "id": "q31",
+      "query": "Tokyo",
+      "language": "en",
+      "annotation_rule": "id=wikivoyage-tokyo",
+      "relevant": [
+        "wikivoyage-tokyo"
+      ],
+      "relevant_count": 1
+    },
+    {
+      "id": "q32",
+      "query": "historic cities in Italy",
+      "language": "en",
+      "annotation_rule": "keyword_in_country=Italy|historic,historical",
+      "relevant": [
+        "wikivoyage-bologna",
+        "wikivoyage-genoa",
+        "wikivoyage-milan",
+        "wikivoyage-naples",
+        "wikivoyage-rome",
+        "wikivoyage-siena",
+        "wikivoyage-verona"
+      ],
+      "relevant_count": 7
+    },
+    {
+      "id": "q33",
+      "query": "beaches in Cuba",
+      "language": "en",
+      "annotation_rule": "keyword_in_country=Cuba|beach,beaches",
+      "relevant": [
+        "wikivoyage-trinidad",
+        "wikivoyage-varadero"
+      ],
+      "relevant_count": 2
+    },
+    {
+      "id": "q34",
+      "query": "wine regions in France",
+      "language": "en",
+      "annotation_rule": "keyword_in_country=France|wine",
+      "relevant": [
+        "wikivoyage-bordeaux",
+        "wikivoyage-dijon",
+        "wikivoyage-reims"
+      ],
+      "relevant_count": 3
+    },
+    {
+      "id": "q35",
+      "query": "Japanese cities",
+      "language": "en",
+      "annotation_rule": "country=Japan",
+      "relevant": [
+        "wikivoyage-hiroshima",
+        "wikivoyage-kyoto",
+        "wikivoyage-nara",
+        "wikivoyage-osaka",
+        "wikivoyage-tokyo"
+      ],
+      "relevant_count": 5
+    },
+    {
+      "id": "q36",
+      "query": "mountain destinations",
+      "language": "en",
+      "annotation_rule": "keyword=mountain",
+      "relevant": [
+        "wikivoyage-alicante",
+        "wikivoyage-cape-town",
+        "wikivoyage-grenoble",
+        "wikivoyage-lima",
+        "wikivoyage-manuel-antonio",
+        "wikivoyage-mendoza",
+        "wikivoyage-perpignan",
+        "wikivoyage-rio-de-janeiro",
+        "wikivoyage-trinidad"
+      ],
+      "relevant_count": 9
+    },
+    {
+      "id": "q37",
+      "query": "desert destinations",
+      "language": "en",
+      "annotation_rule": "keyword=desert",
+      "relevant": [
+        "wikivoyage-dubai",
+        "wikivoyage-jaipur",
+        "wikivoyage-marrakech",
+        "wikivoyage-mendoza"
+      ],
+      "relevant_count": 4
+    },
+    {
+      "id": "q38",
+      "query": "temples and shrines",
+      "language": "en",
+      "annotation_rule": "keyword_any=temple,shrine",
+      "relevant": [
+        "wikivoyage-hanoi",
+        "wikivoyage-jaipur",
+        "wikivoyage-kyoto"
+      ],
+      "relevant_count": 3
+    },
+    {
+      "id": "q39",
+      "query": "colonial cities",
+      "language": "en",
+      "annotation_rule": "keyword=colonial",
+      "relevant": [
+        "wikivoyage-antigua-guatemala",
+        "wikivoyage-casablanca",
+        "wikivoyage-guadalajara",
+        "wikivoyage-hanoi",
+        "wikivoyage-ho-chi-minh-city",
+        "wikivoyage-lima",
+        "wikivoyage-quito",
+        "wikivoyage-santo-domingo",
+        "wikivoyage-tunis"
+      ],
+      "relevant_count": 9
+    },
+    {
+      "id": "q40",
+      "query": "art galleries and museums",
+      "language": "en",
+      "annotation_rule": "keyword_any=museum,gallery",
+      "relevant": [
+        "wikivoyage-albacete",
+        "wikivoyage-cairo",
+        "wikivoyage-edinburgh",
+        "wikivoyage-milan",
+        "wikivoyage-munich",
+        "wikivoyage-xian",
+        "wikivoyage-york"
+      ],
+      "relevant_count": 7
+    },
+    {
+      "id": "q41",
+      "query": "Paris food",
+      "language": "es",
+      "annotation_rule": "id=wikivoyage-paris+kw=food",
+      "relevant": [
+        "wikivoyage-paris"
+      ],
+      "relevant_count": 1
+    },
+    {
+      "id": "q42",
+      "query": "Rome ciudad histórica",
+      "language": "es",
+      "annotation_rule": "id=wikivoyage-rome",
+      "relevant": [
+        "wikivoyage-rome"
+      ],
+      "relevant_count": 1
+    },
+    {
+      "id": "q43",
+      "query": "Caribe playas",
+      "language": "es",
+      "annotation_rule": "caribbean_beaches",
+      "relevant": [
+        "wikivoyage-punta-cana",
+        "wikivoyage-trinidad",
+        "wikivoyage-varadero"
+      ],
+      "relevant_count": 3
+    },
+    {
+      "id": "q44",
+      "query": "destinos de aventura en Africa",
+      "language": "es",
+      "annotation_rule": "africa_union",
+      "relevant": [
+        "wikivoyage-cairo",
+        "wikivoyage-cape-town",
+        "wikivoyage-casablanca",
+        "wikivoyage-fez",
+        "wikivoyage-luxor",
+        "wikivoyage-marrakech",
+        "wikivoyage-nairobi",
+        "wikivoyage-tunis",
+        "wikivoyage-zanzibar"
+      ],
+      "relevant_count": 9
+    },
+    {
+      "id": "q45",
+      "query": "New York",
+      "language": "es",
+      "annotation_rule": "id=wikivoyage-new-york-city",
+      "relevant": [
+        "wikivoyage-new-york-city"
+      ],
+      "relevant_count": 1
+    }
+  ]
+}

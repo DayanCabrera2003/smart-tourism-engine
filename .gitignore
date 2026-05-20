@@ -36,6 +36,7 @@ data/raw/*
 data/processed/
 data/eval/*
 !data/eval/queries.json
+!data/eval/queries_v2.json
 
 # IDEs
 .vscode/
