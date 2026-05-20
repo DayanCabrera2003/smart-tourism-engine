@@ -17,6 +17,7 @@ dependencies = [
     "typer",
     "httpx",
     "nltk",
+    "lingua-language-detector",
     "streamlit",
     "streamlit-folium",
     "folium",

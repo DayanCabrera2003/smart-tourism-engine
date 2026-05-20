@@ -62,6 +62,19 @@ def tokenize(text: str) -> list[str]
 
 Las pruebas unitarias asociadas se encuentran en `tests/test_tokenizer.py`.
 
+## Detección de idioma
+
+Antes de cualquier filtrado o stemming, el pipeline puede determinar si un documento o consulta está en español o en inglés. Esto es necesario porque el corpus combinará Wikipedia ES, Wikivoyage ES y Wikivoyage EN, y cada idioma debe stemizarse con su propio Snowball para que las raíces coincidan en el índice.
+
+La detección vive en `src/indexing/language.py`:
+
+- `detect_language(text: str) -> "es" | "en"` — devuelve la etiqueta del idioma detectado. Si el texto está vacío o es inclasificable, devuelve `"en"` por defecto (el corpus heredado es mayoritariamente inglés y este default no rompe nada).
+- Solo se cargan los dos modelos necesarios (`Language.SPANISH` y `Language.ENGLISH`) para mantener el footprint bajo.
+
+La implementación se apoya en **Lingua** (`lingua-language-detector`), que en su versión 2 usa una capa nativa en Rust y es muy precisa con textos cortos (queries de 2-5 palabras). Se prefirió a `langdetect` porque esta última es no determinista por defecto y mide peor en consultas cortas.
+
+Las pruebas unitarias asociadas viven en `tests/test_language_detect.py` y cubren español, inglés, vacío, una palabra y entradas en un tercer idioma (que deben mapearse a la rama soportada más cercana).
+
 ## Stopwords
 
 Las stopwords son palabras funcionales de alta frecuencia (artículos, preposiciones, conjunciones) que no aportan valor discriminativo al índice. Eliminarlas reduce el tamaño del índice y mejora la precisión de la recuperación.

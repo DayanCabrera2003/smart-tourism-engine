@@ -12,6 +12,7 @@ matplotlib
 prometheus-client
 qdrant-client
 sentence-transformers
+lingua-language-detector
 python-multipart
 pillow
 google-genai
