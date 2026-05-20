@@ -15,10 +15,13 @@ class _StubEmbedder:
     DIMENSION = 8
 
     def __init__(self) -> None:
+        # ``calls`` stores the prefixed text exactly as the model would see it.
         self.calls: list[str] = []
+        self.modes: list[str] = []
 
-    def embed(self, text: str) -> list[float]:
+    def embed(self, text: str, mode: str = "passage") -> list[float]:
         self.calls.append(text)
+        self.modes.append(mode)
         length = len(text) or 1
         raw = [((i + 1) * length) % 7 + 0.5 for i in range(self.DIMENSION)]
         norm = math.sqrt(sum(v * v for v in raw))
@@ -113,6 +116,10 @@ def test_embed_destinations_embeds_name_country_region_description(
 
     embed_destinations(jsonl_file, store, embedder)
 
+    # All ingest calls must use the "passage" prefix variant of the
+    # embedder so the multilingual-e5-small text → vector mapping
+    # matches what queries (prefixed with "query: ") will look up.
+    assert embedder.modes == ["passage", "passage"]
     assert (
         "Madrid. España. Comunidad de Madrid. "
         "Capital de España, conocida por sus museos."

@@ -17,7 +17,7 @@ _NAMESPACE = uuid.UUID("6f3c1a1a-7e71-4c6d-9a62-8b5b3e0a0001")
 
 
 class _Embedder(Protocol):
-    def embed(self, text: str) -> list[float]: ...
+    def embed(self, text: str, mode: str = "passage") -> list[float]: ...
 
 
 def slug_to_uuid(slug: str) -> str:
@@ -72,8 +72,11 @@ def embed_destinations(
     Lee destinos desde ``source`` (JSONL), genera el embedding de cada uno
     y los sube a ``collection`` en batches de ``batch_size``.
 
-    El texto a embeber es ``"{name}. {description}"`` con acentos (el modelo
-    multilingüe aprovecha los diacríticos). El ID del punto es un UUID5
+    El texto a embeber es ``"{name}. {country}. {region}. {description}"``,
+    se conservan los acentos para que el embedder multilingüe
+    (``multilingual-e5-small``) pueda aprovecharlos. Cada llamada al
+    embedder se hace con ``mode="passage"`` para que se aplique el prefijo
+    ``"passage: "`` que el modelo requiere. El ID del punto es un UUID5
     derivado del ``id`` del destino; el slug original se preserva en el
     payload para que el recuperador pueda devolverlo a la UI.
 
@@ -110,7 +113,10 @@ def embed_destinations(
             if only_new and point_id in existing_ids:
                 continue
             text = _build_embedding_text(doc)
-            vector = embedder.embed(text)
+            # multilingual-e5-small expects documents to be prefixed with
+            # "passage: ". The TextEmbedder applies the prefix transparently
+            # when mode="passage" is provided.
+            vector = embedder.embed(text, mode="passage")
             batch.append(_build_point(doc, vector))
             if len(batch) >= batch_size:
                 total += store.upsert(collection, batch)
