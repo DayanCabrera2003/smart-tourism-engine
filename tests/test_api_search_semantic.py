@@ -90,7 +90,13 @@ def teardown_function() -> None:
 
 def test_semantic_search_returns_top_match():
     client = _client()
-    response = client.post("/search/semantic", json={"query": "beach", "top_k": 3})
+    # use_reranker=False keeps the raw cosine score visible (1.0 for a
+    # perfect match). The default True path is exercised by the
+    # dedicated reranker test below.
+    response = client.post(
+        "/search/semantic",
+        json={"query": "beach", "top_k": 3, "use_reranker": False},
+    )
     assert response.status_code == 200
     body = response.json()
     assert len(body["results"]) >= 1

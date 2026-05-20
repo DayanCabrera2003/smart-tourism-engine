@@ -59,12 +59,14 @@ from src.indexing.embedder import TextEmbedder
 from src.indexing.inverted_index import InvertedIndex
 from src.indexing.vector_store import VectorStore
 from src.retrieval.extended_boolean import ExtendedBoolean
+from src.retrieval.freshness import freshness_score
 from src.retrieval.geo_filter import (
     apply_country_filter,
     detect_countries,
     filter_search_hits,
 )
 from src.retrieval.hybrid import HybridRetriever
+from src.retrieval.reranker import Reranker
 
 app = FastAPI(
     title="Smart Tourism Engine API",
@@ -263,6 +265,48 @@ RetrieverFactoryDep = Annotated[
 DestinationsDep = Annotated[dict[str, dict[str, object]], Depends(get_destinations)]
 
 
+def _build_reranker(destinations: dict[str, dict[str, object]]) -> Reranker:
+    """Build a Reranker backed by popularity + freshness from SQLite.
+
+    The popularity column was computed during ingestion (T099) and is
+    already in ``[0, 1]``. Freshness is derived on the fly from
+    ``fetched_at`` because it changes every minute and there is no point
+    persisting it.
+
+    Destinations with missing popularity (legacy rows) contribute zero,
+    which simply means they do not get any boost; relevance still drives
+    the final ordering.
+    """
+    popularity: dict[str, float] = {}
+    freshness: dict[str, float] = {}
+    for doc_id, meta in destinations.items():
+        pop = meta.get("popularity")
+        if isinstance(pop, (int, float)):
+            popularity[doc_id] = float(pop)
+        fetched = meta.get("fetched_at")
+        if isinstance(fetched, str) and fetched:
+            freshness[doc_id] = freshness_score(fetched)
+    return Reranker(popularity=popularity, freshness=freshness)
+
+
+def _maybe_rerank(
+    hits: list[tuple[str, float]],
+    destinations: dict[str, dict[str, object]],
+    *,
+    enabled: bool,
+) -> list[tuple[str, float]]:
+    """Apply the Reranker when the caller opted in.
+
+    Operates on ``(doc_id, score)`` tuples to keep the call sites symmetric
+    across the three search modes. Returns the input untouched when
+    reranking is disabled or when there is nothing to rerank.
+    """
+    if not enabled or not hits:
+        return hits
+    reranker = _build_reranker(destinations)
+    return reranker.rerank(hits)
+
+
 def _build_destination_result(
     doc_id: str,
     score: float,
@@ -316,9 +360,14 @@ def search(
     filtered = apply_country_filter(
         hits_with_country, request.query, country_getter=lambda h: h[2]
     )
+    reranked = _maybe_rerank(
+        [(doc_id, score) for doc_id, score, _ in filtered],
+        destinations,
+        enabled=request.use_reranker,
+    )
     results = [
         _build_destination_result(doc_id, score, destinations)
-        for doc_id, score, _ in filtered[: request.top_k]
+        for doc_id, score in reranked[: request.top_k]
     ]
     return SearchResponse(results=results)
 
@@ -362,14 +411,26 @@ def search_semantic(
         ) from exc
 
     filtered = filter_search_hits(raw_hits, request.query)
+    # Map back to (doc_id, score) so the reranker has a uniform input.
+    semantic_pairs = [
+        (str(payload.get("slug") or point_id), float(score))
+        for point_id, score, payload in filtered
+    ]
+    payload_by_id: dict[str, dict[str, object]] = {
+        str(payload.get("slug") or point_id): payload
+        for point_id, _score, payload in filtered
+    }
+    reranked = _maybe_rerank(
+        semantic_pairs, destinations, enabled=request.use_reranker
+    )
     results = [
         _build_destination_result(
-            str(payload.get("slug") or point_id),
-            float(score),
+            doc_id,
+            score,
             destinations,
-            payload=payload,
+            payload=payload_by_id.get(doc_id),
         )
-        for point_id, score, payload in filtered[: request.top_k]
+        for doc_id, score in reranked[: request.top_k]
     ]
     return SearchResponse(results=results)
 
@@ -407,9 +468,14 @@ def search_hybrid(
     filtered = apply_country_filter(
         hits_with_country, request.query, country_getter=lambda h: h[2]
     )
+    reranked = _maybe_rerank(
+        [(doc_id, score) for doc_id, score, _ in filtered],
+        destinations,
+        enabled=request.use_reranker,
+    )
     results = [
         _build_destination_result(doc_id, score, destinations)
-        for doc_id, score, _ in filtered[: request.top_k]
+        for doc_id, score in reranked[: request.top_k]
     ]
     return SearchResponse(results=results)
 

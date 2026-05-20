@@ -112,7 +112,33 @@ def _build_destinations_map() -> dict[str, dict[str, object]]:
     return {row["id"]: dict(row) for row in rows}
 
 
-def make_boolean_runner(p: float = 2.0) -> Callable[[str], list[str]]:
+def _build_reranker_from_destinations(
+    destinations: dict[str, dict[str, object]],
+):
+    """Mirror of src.api.main._build_reranker so evaluation reflects the API."""
+    from src.retrieval.freshness import freshness_score
+    from src.retrieval.reranker import Reranker
+
+    popularity: dict[str, float] = {}
+    freshness: dict[str, float] = {}
+    for doc_id, meta in destinations.items():
+        pop = meta.get("popularity")
+        if isinstance(pop, (int, float)):
+            popularity[doc_id] = float(pop)
+        fetched = meta.get("fetched_at")
+        if fetched is not None:
+            try:
+                freshness[doc_id] = freshness_score(
+                    fetched.isoformat() if hasattr(fetched, "isoformat") else fetched
+                )
+            except (TypeError, ValueError):
+                pass
+    return Reranker(popularity=popularity, freshness=freshness)
+
+
+def make_boolean_runner(
+    p: float = 2.0, use_reranker: bool = True
+) -> Callable[[str], list[str]]:
     from src.retrieval.extended_boolean import ExtendedBoolean
     from src.retrieval.geo_filter import apply_country_filter
 
@@ -125,6 +151,7 @@ def make_boolean_runner(p: float = 2.0) -> Callable[[str], list[str]]:
         index = pickle.load(fh)
     destinations = _build_destinations_map()
     retriever = ExtendedBoolean(p=p)
+    reranker = _build_reranker_from_destinations(destinations) if use_reranker else None
 
     def run(query: str) -> list[str]:
         hits = retriever.search(query, index, top_k=200)
@@ -135,12 +162,15 @@ def make_boolean_runner(p: float = 2.0) -> Callable[[str], list[str]]:
         filtered = apply_country_filter(
             hits_country, query, country_getter=lambda h: h[2]
         )
-        return [doc_id for doc_id, _, _ in filtered[:10]]
+        pairs = [(doc_id, score) for doc_id, score, _ in filtered]
+        if reranker is not None and pairs:
+            pairs = reranker.rerank(pairs)
+        return [doc_id for doc_id, _ in pairs[:10]]
 
     return run
 
 
-def make_semantic_runner() -> Callable[[str], list[str]]:
+def make_semantic_runner(use_reranker: bool = True) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
     from src.indexing.embedder import TextEmbedder
     from src.indexing.vector_store import VectorStore
@@ -148,19 +178,27 @@ def make_semantic_runner() -> Callable[[str], list[str]]:
 
     embedder = TextEmbedder()
     store = VectorStore()
+    destinations = _build_destinations_map()
+    reranker = _build_reranker_from_destinations(destinations) if use_reranker else None
 
     def run(query: str) -> list[str]:
         vector = embedder.embed(query, mode="query")
         raw = store.search(DEFAULT_COLLECTION, vector, top_k=200)
         filtered = filter_search_hits(raw, query)
-        return [
-            str(payload.get("slug") or pid) for pid, _, payload in filtered[:10]
+        pairs = [
+            (str(payload.get("slug") or pid), float(score))
+            for pid, score, payload in filtered
         ]
+        if reranker is not None and pairs:
+            pairs = reranker.rerank(pairs)
+        return [doc_id for doc_id, _ in pairs[:10]]
 
     return run
 
 
-def make_hybrid_runner(alpha: float = 0.5, p: float = 2.0) -> Callable[[str], list[str]]:
+def make_hybrid_runner(
+    alpha: float = 0.5, p: float = 2.0, use_reranker: bool = True
+) -> Callable[[str], list[str]]:
     from src.indexing.embed_destinations import DEFAULT_COLLECTION
     from src.indexing.embedder import TextEmbedder
     from src.indexing.vector_store import VectorStore
@@ -182,6 +220,7 @@ def make_hybrid_runner(alpha: float = 0.5, p: float = 2.0) -> Callable[[str], li
         collection=DEFAULT_COLLECTION,
         alpha=alpha,
     )
+    reranker = _build_reranker_from_destinations(destinations) if use_reranker else None
 
     def run(query: str) -> list[str]:
         hits = hybrid.search(query, index, top_k=200)
@@ -192,7 +231,10 @@ def make_hybrid_runner(alpha: float = 0.5, p: float = 2.0) -> Callable[[str], li
         filtered = apply_country_filter(
             hits_country, query, country_getter=lambda h: h[2]
         )
-        return [doc_id for doc_id, _, _ in filtered[:10]]
+        pairs = [(doc_id, score) for doc_id, score, _ in filtered]
+        if reranker is not None and pairs:
+            pairs = reranker.rerank(pairs)
+        return [doc_id for doc_id, _ in pairs[:10]]
 
     return run
 

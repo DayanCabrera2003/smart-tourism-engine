@@ -34,6 +34,13 @@ class SearchRequest(BaseModel):
             "(operadores estrictos). Valores típicos para turismo: 2-5."
         ),
     )
+    use_reranker: bool = Field(
+        True,
+        description=(
+            "Si True (default), aplica el Reranker con popularidad y frescura "
+            "sobre los top candidatos antes de cortar a top_k."
+        ),
+    )
 
 
 class SemanticSearchRequest(BaseModel):
@@ -49,6 +56,13 @@ class SemanticSearchRequest(BaseModel):
         ge=1,
         le=100,
         description="Número máximo de vecinos a devolver desde Qdrant.",
+    )
+    use_reranker: bool = Field(
+        True,
+        description=(
+            "Si True (default), aplica el Reranker con popularidad y frescura "
+            "sobre los top candidatos antes de cortar a top_k."
+        ),
     )
 
 
@@ -135,6 +149,13 @@ class HybridSearchRequest(BaseModel):
         ge=1.0,
         le=10.0,
         description="Norma-p de la rama Booleana Extendida.",
+    )
+    use_reranker: bool = Field(
+        True,
+        description=(
+            "Si True (default), aplica el Reranker con popularidad y frescura "
+            "sobre los top candidatos antes de cortar a top_k."
+        ),
     )
 
 
