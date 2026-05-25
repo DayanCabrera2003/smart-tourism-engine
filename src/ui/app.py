@@ -40,6 +40,7 @@ from src.recommendation.synthetic_profiles import (
 from src.retrieval.freshness import freshness_score
 from src.retrieval.positioning import build_positioning_sections
 from src.ui.accessibility import image_alt, image_attribution
+from src.ui.bootstrap_panel import render_bootstrap_banner, render_bootstrap_tab
 from src.ui.i18n import DEFAULT_LOCALE, LOCALES, t
 from src.ui.theme import DEFAULT_THEME, THEMES, theme_css
 
@@ -566,8 +567,16 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
                 ),
             )
 
-    tab_search, tab_ask, tab_image, tab_reco = st.tabs(
-        ["Buscar destinos", "Preguntar", "Buscar por imagen", "Recomendado para ti"]
+    render_bootstrap_banner(st, API_URL)
+
+    tab_search, tab_ask, tab_image, tab_reco, tab_system = st.tabs(
+        [
+            "Buscar destinos",
+            "Preguntar",
+            "Buscar por imagen",
+            "Recomendado para ti",
+            "Sistema",
+        ]
     )
 
     with tab_search:
@@ -640,6 +649,9 @@ def _render() -> None:  # pragma: no cover - depende del runtime de Streamlit
 
     with tab_reco:
         _render_recommend_tab(st)
+
+    with tab_system:
+        render_bootstrap_tab(st, API_URL)
 
 
 IMAGE_GALLERY_THRESHOLD = 3
