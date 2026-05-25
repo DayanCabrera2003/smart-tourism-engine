@@ -74,7 +74,7 @@ El campo `review_status: "pending_human_validation"` señala que las anotaciones
 
 ### Limitaciones declaradas
 
-- El corpus es **mono-idioma inglés** (Wikivoyage). Las queries en español funcionan porque los modos semántico y híbrido usan un embedder multilingüe (`all-MiniLM-L6-v2`), pero el modo booleano tiene desventaja inherente con queries en español.
+- El corpus es **bilingüe** (Wikivoyage en inglés + Wikipedia ES). Las queries en cualquiera de los dos idiomas funcionan en semántico/híbrido gracias al embedder multilingüe (`intfloat/multilingual-e5-small`) y, complementariamente, al módulo de expansión bilingüe (`src/retrieval/bilingual_query.py`) que suma sinónimos turísticos en el idioma "opuesto". El modo booleano puro sigue teniendo desventaja cuando la query y los documentos están en idiomas distintos.
 - Las reglas de keyword usan **whole-word matching** (`\bbeach\b`), no stemming. Esto se hace porque el ground truth debe ser literalmente verificable; el recuperador es el que aplica stemming.
 - No hay queries adversariales (típos, sinónimos exóticos, dominios fuera de turismo). Se podrían añadir como segunda iteración.
 

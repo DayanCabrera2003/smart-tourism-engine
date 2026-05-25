@@ -241,7 +241,7 @@ buttons en el sidebar:
 | Modo | Endpoint | Descripción |
 |------|----------|-------------|
 | **Booleano Extendido** | `POST /search` | Rankeo léxico con p-norm (Salton/Fox/Wu 1983). Soporta operadores `AND`/`OR` en mayúsculas. |
-| **Semántico** | `POST /search/semantic` | Embeddings densos con `all-MiniLM-L6-v2` consultados en Qdrant. Sin operadores; lenguaje natural. |
+| **Semántico** | `POST /search/semantic` | Embeddings densos con `intfloat/multilingual-e5-small` (384 d) consultados en Qdrant. Sin operadores; lenguaje natural. |
 | **Hibrido** | `POST /search/hybrid` | Combinación lineal de ambos modos: `score = α · léxico + (1-α) · semántico`. |
 
 ### Slider de alpha

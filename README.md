@@ -21,7 +21,7 @@ Proyecto Integrador del curso de SRI (2025-2026, 2do semestre).
 | Backend | FastAPI + Uvicorn |
 | UI | Streamlit + streamlit-folium |
 | Recuperador léxico | Booleano clásico y Booleano Extendido (p-norm, Salton/Fox/Wu 1983) |
-| Embeddings de texto | `sentence-transformers/all-MiniLM-L6-v2` (384 dim) |
+| Embeddings de texto | `intfloat/multilingual-e5-small` (384 dim, multilingüe) |
 | Embeddings multimodales | `clip-ViT-B-32` (512 dim) |
 | Base vectorial | Qdrant |
 | Persistencia metadatos | SQLite (vía SQLAlchemy) |

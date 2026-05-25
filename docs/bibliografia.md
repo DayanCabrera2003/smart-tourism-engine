@@ -26,9 +26,11 @@ Esta sección contiene la bibliografía y referencias técnicas utilizadas duran
 
 ## Embeddings densos y modelos multimodales
 
-7. **Reimers, N., & Gurevych, I.** (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.* EMNLP-IJCNLP. Base del modelo `sentence-transformers/all-MiniLM-L6-v2` que usa `TextEmbedder` (384 dim).
+7. **Reimers, N., & Gurevych, I.** (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.* EMNLP-IJCNLP. Base de la familia `sentence-transformers` que utiliza `TextEmbedder`.
 
-8. **Radford, A., et al.** (2021). *Learning Transferable Visual Models From Natural Language Supervision.* ICML 2021 (paper CLIP de OpenAI). Modelo `clip-ViT-B-32` que usa `ClipEmbedder` para el espacio multimodal (512 dim).
+8. **Wang, L., Yang, N., Huang, X., Yang, L., Majumder, R., & Wei, F.** (2024). *Multilingual E5 Text Embeddings: A Technical Report.* arXiv:2402.05672. Familia E5 multilingüe; el sistema usa la variante `intfloat/multilingual-e5-small` (118 M parámetros, 384 dim) como embedder de texto para Wikivoyage EN + Wikipedia ES.
+
+9. **Radford, A., et al.** (2021). *Learning Transferable Visual Models From Natural Language Supervision.* ICML 2021 (paper CLIP de OpenAI). Modelo `clip-ViT-B-32` que usa `ClipEmbedder` para el espacio multimodal (512 dim).
 
 ---
 

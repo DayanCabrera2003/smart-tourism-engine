@@ -69,22 +69,20 @@ vector = embedder.embed("Playas del Caribe colombiano")
 assert len(vector) == TextEmbedder.DIMENSION  # 384
 ```
 
-### ¿Por qué `all-MiniLM-L6-v2`?
+### ¿Por qué `intfloat/multilingual-e5-small`?
 
-| Criterio | `all-MiniLM-L6-v2` | Alternativas |
-|----------|--------------------|--------------|
-| Tamaño | ~90 MB, 22 M parámetros | `mpnet-base-v2` ~420 MB; modelos LLM > 1 GB |
-| Dimensión | 384 | `mpnet-base-v2` 768 (mayor coste en Qdrant) |
-| Velocidad CPU | ~14 k oraciones/s en un i7 moderno | `mpnet` ~2.8 k/s |
-| Multilingüe | Rinde razonablemente en ES/EN tras fine-tuning de STS | Modelos monolingües pierden en EN+ES mixto |
-| Licencia | Apache-2.0 | Varias |
+El embedder usado por el sistema es `intfloat/multilingual-e5-small`. Cuando el corpus se expandió a un mix bilingüe (Wikivoyage EN + Wikipedia ES), el modelo previo `all-MiniLM-L6-v2` empezó a rankear stubs y páginas de redirección por encima de destinos reales en las queries en español. La migración a e5-small mantuvo la dimensión (384) pero ganó en cobertura idiomática.
 
-Para un catálogo de destinos con descripciones cortas (pocos párrafos) y una
-máquina de desarrollo sin GPU, MiniLM ofrece el mejor equilibrio
-**calidad/velocidad/tamaño** y encaja con la dimensión 384 que usará la
-colección `destinations_text`. Los vectores se generan **normalizados L2**
-(`normalize_embeddings=True`) para que la métrica `Cosine` en Qdrant sea
-numéricamente equivalente al producto punto.
+| Criterio | `intfloat/multilingual-e5-small` (actual) | `all-MiniLM-L6-v2` (anterior) |
+|----------|-------------------------------------------|-------------------------------|
+| Tamaño | ~118 M parámetros, ~470 MB en disco | ~22 M parámetros, ~90 MB |
+| Dimensión | 384 (preservada para no migrar Qdrant) | 384 |
+| Idiomas | 100, optimizado para retrieval EN/ES | Monolingüe (EN), degradado en ES |
+| Velocidad CPU | ~16-30 ms por query en un i7 moderno | ~5-10 ms por query |
+| Prefijos requeridos | Sí: `"query: "` y `"passage: "` | No |
+| Licencia | MIT | Apache-2.0 |
+
+La penalización en latencia es aceptable para un catálogo de pocos miles de destinos. La diferencia más significativa es funcional: e5-small requiere prefijar la entrada con `"query: "` o `"passage: "` según su rol; el wrapper `TextEmbedder` los aplica de forma transparente vía el argumento `mode`. Los vectores se generan **normalizados L2** (`normalize_embeddings=True`) para que la métrica `Cosine` en Qdrant sea numéricamente equivalente al producto punto.
 
 ### Tests
 
@@ -111,7 +109,7 @@ La colección que aloja los embeddings de los destinos se llama
 | Aspecto | Valor | Justificación |
 |---------|-------|---------------|
 | Nombre | `destinations_text` | Separa vectores textuales de futuras colecciones (p. ej. imágenes). |
-| Dimensión | `384` | Coincide con la salida de `all-MiniLM-L6-v2` (`TextEmbedder.DIMENSION`). |
+| Dimensión | `384` | Coincide con la salida de `intfloat/multilingual-e5-small` (`TextEmbedder.DIMENSION`). |
 | Distancia | `Cosine` | Los vectores se entregan normalizados L2, por lo que coseno ≡ producto punto. |
 | ID del punto | entero o UUID | Qdrant exige uno de estos dos tipos; usaremos el id interno del destino. |
 | Payload típico | `{ "name": str, "country": str, "slug": str, ... }` | Campos que el recuperador expondrá al UI tras un hit. |
@@ -212,7 +210,7 @@ Las métricas reportadas son:
 |-------|-------------|
 | `points_count` | Número total de puntos en la colección. |
 | `indexed_vectors_count` | Vectores indexados y listos para búsqueda. |
-| `vector_dimension` | Tamaño del vector (384 para `all-MiniLM-L6-v2`). |
+| `vector_dimension` | Tamaño del vector (384 para `intfloat/multilingual-e5-small`). |
 | `distance_metric` | Métrica de distancia configurada (Cosine). |
 | `vectors_size_bytes` | Estimación del tamaño en bytes: `N × dim × 4`. |
 
@@ -257,7 +255,7 @@ python -m src.cli embed --source data/processed/destinations.jsonl --batch-size 
 ### Texto a embeber
 
 Para cada destino se construye la cadena `f"{name}. {description}"` con
-acentos y puntuación — el modelo multilingüe `all-MiniLM-L6-v2` aprovecha
+acentos y puntuación — el modelo multilingüe `intfloat/multilingual-e5-small` aprovecha
 los diacríticos, a diferencia del índice Booleano Extendido que consume
 `description_normalized`.
 

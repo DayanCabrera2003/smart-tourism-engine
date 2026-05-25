@@ -290,7 +290,7 @@ python -m src.cli build-index data/raw/destinations.jsonl --output data/processe
 
 `POST /search/semantic` complementa al recuperador léxico: en vez de evaluar
 operadores AND/OR sobre el índice invertido, embebe la consulta con
-`TextEmbedder` (`all-MiniLM-L6-v2`, 384 d, normalizado L2) y la lanza contra
+`TextEmbedder` (`intfloat/multilingual-e5-small`, 384 d, normalizado L2) y la lanza contra
 la colección `destinations_text` de Qdrant para devolver los `top_k` vecinos
 más cercanos por similitud coseno.
 

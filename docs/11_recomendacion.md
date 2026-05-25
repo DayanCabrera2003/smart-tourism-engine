@@ -35,7 +35,7 @@ Si no hay señal (sin intereses y sin historial cubierto por `history_embeddings
 
 ### Decisiones de diseño
 
-- **Mismo espacio que los destinos**: usar `TextEmbedder` (384 dim, `all-MiniLM-L6-v2`) garantiza que `coseno(perfil, destino)` esté bien definido contra cualquier punto de la colección `destinations_text` sin re-encoding ni proyección.
+- **Mismo espacio que los destinos**: usar `TextEmbedder` (384 dim, `intfloat/multilingual-e5-small`) garantiza que `coseno(perfil, destino)` esté bien definido contra cualquier punto de la colección `destinations_text` sin re-encoding ni proyección.
 - **Embedding lazy**: el perfil puede vivir sin embedding (recién creado u offline) y materializarlo cuando el recomendador lo necesita. Persistir un vector que rápidamente se vuelve obsoleto contra cambios de catálogo no aporta valor.
 - **Tag normalization fuera**: la normalización textual (acentos, minúsculas) ocurre dentro del embedder; el perfil guarda los tags tal cual los declara el usuario para poder mostrarlos en la UI.
 
@@ -66,7 +66,7 @@ Si no hay señal (sin intereses y sin historial cubierto por `history_embeddings
 ### Decisiones de diseño
 
 - **Seis perfiles, no más**: superar seis presets satura la decisión inicial del usuario sin aportar cobertura adicional, porque los segmentos turísticos del corpus solapan más allá de ese número.
-- **Intereses en español**: la UI los muestra tal cual, y el embedder `all-MiniLM-L6-v2` es multilingüe, por lo que no se pierde calidad al embeber tags en español contra descripciones de destinos en cualquier idioma del catálogo.
+- **Intereses en español**: la UI los muestra tal cual, y el embedder `intfloat/multilingual-e5-small` cubre 100 idiomas, por lo que no se pierde calidad al embeber tags en español contra descripciones de destinos en cualquier idioma del catálogo.
 - **Namespace `synthetic:`**: distingue los perfiles preset de los perfiles reales en `user_id`, evitando colisiones si en el futuro se persisten usuarios reales.
 
 ---
