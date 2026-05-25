@@ -83,6 +83,35 @@ from src.api.metrics import install_metrics  # noqa: E402
 
 install_metrics(app)
 
+# Bootstrap router exposes the endpoints the UI hits to initialize
+# the system and to clean previously indexed data.
+from src.api import bootstrap_router  # noqa: E402
+
+app.include_router(bootstrap_router.router)
+
+
+def _clear_dependency_caches() -> None:
+    """Bust every lru_cache that holds a singleton tied to disk state.
+
+    Called by the bootstrap router after a successful pipeline run or
+    a reset so the next request rebuilds the index/destinations/qdrant
+    handles against the new on-disk state instead of returning stale data.
+    """
+    for cached in (
+        _load_index_from_disk,
+        _load_destinations_from_disk,
+        _default_vector_store,
+        _default_embedder,
+        _default_rag_pipeline,
+        _default_clip_embedder,
+        _default_recommendation_service,
+        _default_cross_encoder,
+    ):
+        cached.cache_clear()
+
+
+bootstrap_router.register_cache_buster(_clear_dependency_caches)
+
 
 # ── Dependencias ──────────────────────────────────────────────────────────────
 
