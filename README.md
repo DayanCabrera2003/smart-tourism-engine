@@ -1,6 +1,6 @@
 # Smart Tourism Engine
 
-![CI](https://github.com/dayancc/smart-tourism-engine/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/DayanCabrera2003/smart-tourism-engine/actions/workflows/ci.yml/badge.svg)
 
 Sistema de Recuperación de Información (SRI) para turismo y viajes. Permite consultas en lenguaje natural sobre destinos turísticos y devuelve resultados rankeados, respuestas generadas con RAG, búsqueda multimodal (texto + imágenes) y recomendaciones personalizadas con re-ranking por popularidad, frescura y perfil de usuario.
 
@@ -46,7 +46,12 @@ El informe completo vive en [docs/](docs/). El índice principal está en [docs/
 - [docs/11_recomendacion.md](docs/11_recomendacion.md) — perfiles sintéticos, content-based, pseudo-colaborativo, híbrido.
 - [docs/12_interfaz.md](docs/12_interfaz.md) — UI Streamlit, secciones y mapa.
 - [docs/13_posicionamiento.md](docs/13_posicionamiento.md) — popularidad, frescura, re-ranker, MMR.
-- [docs/15_despliegue.md](docs/15_despliegue.md) — variables de entorno y despliegue.
+- [docs/14_evaluacion.md](docs/14_evaluacion.md) — métricas P@k, R@k, F1@k, MAP, MRR, nDCG@k.
+- [docs/15_despliegue.md](docs/15_despliegue.md) — despliegue con Docker y modo desarrollo.
+- [docs/16_manual_usuario.md](docs/16_manual_usuario.md) — manual de usuario, orden de ejecución mínimo.
+- [docs/17_critica_y_deficiencias.md](docs/17_critica_y_deficiencias.md) — opinión crítica, deficiencias, trabajo futuro.
+
+El informe academico LNCS de 12 páginas (formato de entrega) vive en [informe_lncs/main.pdf](informe_lncs/main.pdf).
 
 ---
 
@@ -117,7 +122,7 @@ A continuación se explica cómo verificar cada bloque funcional del sistema. Lo
 
 ### A. Suite de tests automatizados
 
-Cubre 507 casos con stubs y datos sintéticos. No requiere servicios externos.
+Cubre 799 casos con stubs y datos sintéticos. No requiere servicios externos.
 
 ```bash
 source venv/bin/activate
@@ -125,7 +130,7 @@ ruff check src tests scripts
 pytest -q
 ```
 
-Salida esperada: `All checks passed!` para ruff y `507 passed` para pytest.
+Salida esperada: `All checks passed!` para ruff y `799 passed` para pytest.
 
 Tests específicos por capítulo:
 
@@ -161,7 +166,7 @@ python scripts/stats.py
 Verificación:
 
 ```bash
-wc -l data/processed/destinations.jsonl     # debe imprimir 200+ líneas
+wc -l data/processed/destinations.jsonl     # debe imprimir 957 líneas
 python -c "import json; d=[json.loads(l) for l in open('data/processed/destinations.jsonl')]; print(len(d), 'destinos')"
 ```
 
@@ -239,7 +244,7 @@ curl -X POST http://localhost:8000/search/semantic \
 
 curl -X POST http://localhost:8000/search/hybrid \
   -H 'Content-Type: application/json' \
-  -d '{"query":"city OR culture","top_k":5,"alpha":0.5,"p":2.0}'
+  -d '{"query":"city OR culture","top_k":5,"alpha":0.4,"p":2.0}'
 ```
 
 ### F. RAG (Fase 5)
@@ -249,7 +254,7 @@ Requiere Qdrant levantado + `LLM_API_KEY` configurada.
 ```bash
 curl -X POST http://localhost:8000/ask \
   -H 'Content-Type: application/json' \
-  -d '{"query":"¿Qué ciudades históricas debería visitar en España?","top_k":5,"mode":"hybrid","alpha":0.5}'
+  -d '{"query":"¿Qué ciudades históricas debería visitar en España?","top_k":5,"mode":"hybrid","alpha":0.4}'
 ```
 
 La respuesta trae `answer`, `sources` (con citas inline `[1]`, `[2]`) y `low_confidence`.
@@ -259,7 +264,7 @@ Streaming SSE:
 ```bash
 curl -N -X POST http://localhost:8000/ask/stream \
   -H 'Content-Type: application/json' \
-  -d '{"query":"Recomienda 3 destinos para mochileros","top_k":5,"mode":"hybrid","alpha":0.5}'
+  -d '{"query":"Recomienda 3 destinos para mochileros","top_k":5,"mode":"hybrid","alpha":0.4}'
 ```
 
 ### G. Búsqueda web fallback (Fase 6)
@@ -297,7 +302,7 @@ curl -X POST http://localhost:8000/search/by-image \
 # Multimodal combinado (texto + imagen opcional en base64)
 curl -X POST http://localhost:8000/search/multimodal \
   -H 'Content-Type: application/json' \
-  -d '{"query":"playa al atardecer","top_k":5,"alpha":0.5}'
+  -d '{"query":"playa al atardecer","top_k":5,"alpha":0.4}'
 ```
 
 Nota: si `data/raw/images/` está vacío (caso por defecto en esta entrega), los tres endpoints responden 503 con un mensaje claro.
@@ -414,25 +419,32 @@ uvicorn src.api.main:app --workers 2 --host 0.0.0.0 --port 8000
 
 ```
 smart-tourism-engine/
-├── docs/                     # Documentación por capítulo
+├── Dockerfile                # Imagen única reutilizada por API y UI
+├── docker-compose.yml        # Stack: qdrant + api + ui
+├── .dockerignore
+├── docs/                     # Documentación técnica por capítulo (informe largo)
+├── informe_lncs/             # Informe académico LNCS 12 páginas (entregable)
 ├── data/
-│   ├── raw/                  # JSON crudo de Wikivoyage, imágenes
-│   └── processed/            # JSONL normalizado, SQLite, index.pkl
-├── scripts/                  # Utilidades: download, init_qdrant, popularity, stats
+│   ├── raw/                  # JSON crudo de Wikivoyage, imágenes (gitignored)
+│   ├── processed/            # JSONL normalizado, SQLite, index.pkl
+│   └── eval/                 # queries.json (v1) y queries_v2.json (957 corpus)
+├── scripts/                  # download_wikivoyage, build_corpus, init_qdrant, popularity, stats, build_pdf
 ├── src/
-│   ├── api/                  # FastAPI (endpoints, schemas, middleware)
-│   ├── ingestion/            # Wikivoyage, OpenTripMap, normalize, store
-│   ├── indexing/             # Tokenizer, inverted index, embedder, vector store
-│   ├── retrieval/            # Boolean, ExtendedBoolean, hybrid, reranker, MMR, popularity, freshness, positioning
+│   ├── api/                  # FastAPI (main, schemas, middleware, metrics, bootstrap_router)
+│   ├── ingestion/            # Wikivoyage, Wikidata/Wikipedia, robots, normalize, store, feedback
+│   ├── indexing/             # Tokenizer, inverted index, embedder, vector store, build_index
+│   ├── retrieval/            # Boolean, ExtendedBoolean, hybrid, bilingual_query, geo_filter, cross_encoder_reranker, reranker, MMR, popularity, freshness, positioning
 │   ├── rag/                  # LLM client, prompts, pipeline, context builder
 │   ├── web_search/           # Tavily, trigger, converter
 │   ├── multimodal/           # CLIP embedder, image indexer, fusion
 │   ├── recommendation/       # UserProfile, synthetic profiles, content-based, collaborative, hybrid, service
-│   ├── ui/                   # Streamlit app
-│   ├── cli.py                # Comando typer (build-index, embed, embed-images, ingest)
+│   ├── evaluation/           # Métricas P/R/F1/MAP/MRR/nDCG, runner, retrievers adapters, plots
+│   ├── bootstrap/            # Pipeline reproducible: state, reset, pipeline (8 fases)
+│   ├── ui/                   # Streamlit app + bootstrap_panel (tab Sistema)
+│   ├── cli.py                # Comando typer (build-index, embed, embed-images, ingest, evaluate)
 │   ├── config.py             # Pydantic Settings
 │   └── logging_config.py
-├── tests/                    # 507 tests pytest
+├── tests/                    # 799 tests pytest
 ├── pyproject.toml
 ├── requirements.txt
 └── .env.example
@@ -446,7 +458,7 @@ Documentado con honestidad para la defensa:
 
 - El corpus actual es **bi-fuente** (957 destinos: 179 de Wikivoyage en inglés + 778 de Wikidata/Wikipedia en español). La columna `popularity` se aproxima a partir de la longitud de descripción + menciones cruzadas porque ninguna de las dos fuentes expone un `reviews_count`.
 - La tabla SQLite `destinations` puede quedar fuera de sincronía con `data/processed/destinations.jsonl` si no se re-ingiere después de regenerar el JSONL. La UI degrada elegantemente (popularidad, país y coordenadas en `null`) en ese caso.
-- Las búsquedas semántica, híbrida, multimodal, RAG y recomendación requieren **Qdrant corriendo**; si está caído, los endpoints devuelven 500 en lugar de 503 (mismo patrón en todos esos endpoints).
+- Las búsquedas semántica, híbrida, multimodal, RAG y recomendación requieren **Qdrant corriendo**. Si Qdrant cae, los endpoints devuelven 503 `service_unavailable` con un cuerpo JSON consistente (los handlers de `qdrant_client.ResponseHandlingException` y `UnexpectedResponse` están registrados explícitamente en el middleware).
 - La búsqueda multimodal funciona solo cuando hay imágenes descargadas en `data/raw/images/`; el script de descarga de imágenes no se ejecuta por defecto en esta entrega.
 - El fallback Tavily requiere `TAVILY_API_KEY`. Sin ella, se omite y el RAG responde solo con el contexto local.
 - Las métricas formales del recuperador (Precision@k, Recall@k, F1@k, MAP, MRR, nDCG@k) están implementadas en `src/evaluation/` y se ejecutan con `python -m src.cli evaluate --queries data/eval/queries_v2.json`. El detalle, las definiciones y los números actuales viven en el capítulo 14.
