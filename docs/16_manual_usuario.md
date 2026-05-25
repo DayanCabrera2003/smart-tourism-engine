@@ -43,6 +43,21 @@ Las variables relevantes:
 
 ### 1.4 Orden de ejecución mínimo
 
+Hay dos caminos: **Docker** (recomendado, una sola operación visual) o **CLI manual** (útil para hackear partes del pipeline).
+
+#### Camino A — Docker + UI (recomendado para la entrega)
+
+```bash
+docker compose build      # ~3-5 min la primera vez
+docker compose up -d
+```
+
+Abrir `http://localhost:8501` y entrar al tab **Sistema**. Si el banner dice "Sistema no inicializado", pulsar **Inicializar sistema**. La barra de progreso muestra las 8 fases del pipeline (`detect → crawl → ingest → sqlite → index → popularity → qdrant → embed`); ver capítulo 02 para el detalle de cada una. Tiempo total: ~5 min si `data/raw/` ya existe localmente, ~25-30 min en una clone fresca que debe crawlear Wikivoyage.
+
+Para limpiar antes de grabar el video (requisito del enunciado), el mismo tab ofrece **Limpiar índices** (mantiene el raw, reindex rápido) o **Limpiar TODO** (borra raw, fuerza crawl completo, requiere escribir `BORRAR` para confirmar).
+
+#### Camino B — CLI manual (instalación local sin Docker)
+
 ```bash
 # 1. Ingestar el corpus
 python -m src.cli ingest wikivoyage
