@@ -449,7 +449,7 @@ Documentado con honestidad para la defensa:
 - Las búsquedas semántica, híbrida, multimodal, RAG y recomendación requieren **Qdrant corriendo**; si está caído, los endpoints devuelven 500 en lugar de 503 (mismo patrón en todos esos endpoints).
 - La búsqueda multimodal funciona solo cuando hay imágenes descargadas en `data/raw/images/`; el script de descarga de imágenes no se ejecuta por defecto en esta entrega.
 - El fallback Tavily requiere `TAVILY_API_KEY`. Sin ella, se omite y el RAG responde solo con el contexto local.
-- Las métricas formales del recuperador (Precision@k, Recall@k, MAP, MRR, nDCG) están previstas en T105-T109 pero todavía no implementadas; se planifican para el Corte 3.
+- Las métricas formales del recuperador (Precision@k, Recall@k, F1@k, MAP, MRR, nDCG@k) están implementadas en `src/evaluation/` y se ejecutan con `python -m src.cli evaluate --queries data/eval/queries_v2.json`. El detalle, las definiciones y los números actuales viven en el capítulo 14.
 
 ---
 
