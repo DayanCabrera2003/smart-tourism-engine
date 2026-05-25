@@ -158,6 +158,28 @@ El sistema utiliza un esquema de **Logging Estructurado** en formato JSON, facil
 - **Campos base**: `timestamp` (ISO-8601 UTC), `level`, `message`, `module`, `funcName` y `lineno`.
 - **Configuración**: El nivel de detalle se ajusta mediante la variable de entorno `LOG_LEVEL` (vía `src/config.py`).
 
+## Empaquetado y despliegue con Docker
+
+El repositorio incluye un `Dockerfile` único que sirve a la API (FastAPI) y a la UI (Streamlit) cambiando el `command` en `docker-compose.yml`. La orquestación reúne tres servicios:
+
+| Servicio | Imagen | Puerto host | Rol |
+|---|---|---|---|
+| `qdrant` | `qdrant/qdrant:latest` | 6333, 6334 | Base vectorial |
+| `api` | `ste-app:latest` (build local) | 8000 | FastAPI + uvicorn |
+| `ui` | `ste-app:latest` (build local) | 8501 | Streamlit |
+
+Decisiones de diseño:
+
+- **Imagen base `python:3.12-slim`** con `torch==2.5.1+cpu` instalado explícitamente desde el índice de PyTorch para evitar arrastrar CUDA (~2 GB extra) que el despliegue de demo no necesita.
+- **Pin versions de `sentence-transformers==5.3.0` y `transformers==5.5.0`**, ya que la combinación más reciente (transformers 5.6+) rompe `sentence-transformers 5.3` por un cambio interno de `accelerate`. Pinear garantiza reproducibilidad bit-exacta de los embeddings entre el entorno local y el contenedor.
+- **Volúmenes con bind mount** para `data/` y `qdrant_storage/`: el catálogo y los vectores sobreviven a `docker compose down`, y el desarrollador puede inspeccionar/editar archivos desde el host sin entrar al contenedor.
+- **Volumen nombrado `ste_hf_cache`** para los pesos de HuggingFace; la primera descarga (~150 MB de embedder + 600 MB opcionales de CLIP) se reutiliza entre reinicios y entre rebuilds de la imagen.
+- **Usuario `appuser` (UID 1000)** dentro del contenedor coincide con el UID típico del host Linux, evitando problemas de permisos en los archivos creados por el bootstrap pipeline.
+- **Healthcheck propio** sobre `/health` en el contenedor `api`; el contenedor `ui` declara `depends_on: api: condition: service_healthy` para no arrancar antes de que la API esté lista.
+- **El `.dockerignore`** excluye `venv/`, `data/`, `qdrant_storage/`, `docs/`, `tests/` y demás artefactos que no son necesarios en runtime, manteniendo la imagen alrededor de los 3 GB en disco (817 MB el manifiesto final).
+
+El despliegue completo está documentado en el capítulo 15 (`docs/15_despliegue.md`), incluyendo los pasos de `docker compose build`, `up`, `logs`, `down`, y la inicialización del corpus desde la UI.
+
 ## Estrategia de Testing
 
 El proyecto adopta un enfoque de desarrollo basado en pruebas (TDD incremental) para asegurar la integridad de los componentes del SRI.
