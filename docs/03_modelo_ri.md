@@ -49,17 +49,18 @@ ExtendedBoolean(p: float = 2.0)
 
 Lanza `ValueError` si `p ≤ 0`.
 
-### Método `score`
+### Métodos principales
 
 ```python
-score(query: str, doc_id: str) -> float
+or_norm(weights: list[float]) -> float
+and_norm(weights: list[float]) -> float
+evaluate(ast: Node, doc_weights: dict[str, float]) -> float
+search(query: str, index: InvertedIndex, top_k: int) -> list[tuple[str, float]]
 ```
 
-Calcula la similitud p-norm entre una consulta y un documento.
-Devuelve un valor en `[0, 1]`.
+`or_norm` y `and_norm` aplican las fórmulas p-norm de Salton/Fox/Wu sobre una lista de pesos en `[0, 1]` y devuelven la similitud en el mismo rango. `evaluate` recorre el AST de la consulta (literales, OR, AND) y combina las puntuaciones de los hijos con la norma correspondiente. `search` parsea la consulta, calcula los pesos TF-IDF normalizados por documento y devuelve los `top_k` mejor rankeados.
 
-> **Estado actual (T032):** el método devuelve `0.0` como esqueleto.
-> Las fórmulas OR e AND se implementan en T033 y T034 respectivamente.
+> **Estado actual:** ambas fórmulas (OR y AND) están implementadas en `src/retrieval/extended_boolean.py`. El stub previo (`score()`) fue eliminado del código (commit 1fa4e61) por estar muerto: ningún consumidor lo llamaba y los tests asociados se removieron.
 
 ## Fórmulas
 
