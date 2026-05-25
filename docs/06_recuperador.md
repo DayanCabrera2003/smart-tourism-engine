@@ -253,7 +253,7 @@ Las pruebas unitarias asociadas se encuentran en `tests/test_extended_boolean.py
 
 ## Tests de integración (T038)
 
-`tests/test_retrieval.py` verifica el pipeline completo sobre el índice real (`data/processed/index.pkl`, 206 documentos Wikivoyage).
+`tests/test_retrieval.py` verifica el pipeline completo sobre el índice real (`data/processed/index.pkl`, **957 documentos**: 179 de Wikivoyage en inglés + 778 de Wikidata/Wikipedia en español).
 
 ### Queries verificadas
 

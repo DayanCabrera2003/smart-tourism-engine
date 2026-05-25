@@ -224,7 +224,7 @@ docker run -p 6333:6333 -p 6334:6334 \
 
 # En otra terminal: crear colecciones y materializar embeddings
 python scripts/init_qdrant.py
-python -m src.cli embed              # destinations_text, ~5-10 min con 206 destinos
+python -m src.cli embed              # destinations_text, ~5-7 min con 957 destinos
 ```
 
 Verificación:
@@ -444,7 +444,7 @@ smart-tourism-engine/
 
 Documentado con honestidad para la defensa:
 
-- El corpus actual es **mono-fuente** (Wikivoyage, 206 destinos). La columna `popularity` se aproxima a partir de la longitud de descripción + menciones cruzadas porque no hay reviews count ni una segunda fuente activa.
+- El corpus actual es **bi-fuente** (957 destinos: 179 de Wikivoyage en inglés + 778 de Wikidata/Wikipedia en español). La columna `popularity` se aproxima a partir de la longitud de descripción + menciones cruzadas porque ninguna de las dos fuentes expone un `reviews_count`.
 - La tabla SQLite `destinations` puede quedar fuera de sincronía con `data/processed/destinations.jsonl` si no se re-ingiere después de regenerar el JSONL. La UI degrada elegantemente (popularidad, país y coordenadas en `null`) en ese caso.
 - Las búsquedas semántica, híbrida, multimodal, RAG y recomendación requieren **Qdrant corriendo**; si está caído, los endpoints devuelven 500 en lugar de 503 (mismo patrón en todos esos endpoints).
 - La búsqueda multimodal funciona solo cuando hay imágenes descargadas en `data/raw/images/`; el script de descarga de imágenes no se ejecuta por defecto en esta entrega.

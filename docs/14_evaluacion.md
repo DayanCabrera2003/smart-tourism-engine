@@ -13,11 +13,11 @@ El archivo `data/eval/queries.json` contiene **22 queries en español e inglés*
 ```json
 {
   "metadata": {
-    "version": "1.0",
-    "total_queries": 22,
+    "version": "2.0",
+    "total_queries": 45,
     "annotation_methodology": "...",
-    "review_status": "pending_human_validation",
-    "corpus_size": 206
+    "review_status": "regenerated_for_expanded_corpus",
+    "corpus_size": 957
   },
   "queries": [
     {
@@ -31,6 +31,8 @@ El archivo `data/eval/queries.json` contiene **22 queries en español e inglés*
   ]
 }
 ```
+
+El archivo activo para la evaluación es `data/eval/queries_v2.json` (45 queries, 957 destinos). `queries.json` v1.0 (22 queries, 206 destinos) se conserva como referencia histórica del corte anterior, pero los resultados de la entrega final se reportan sobre v2.
 
 ### Metodología de anotación
 
@@ -195,20 +197,15 @@ Si Qdrant no responde o el embedder no puede materializarse, ese modo se marca c
 | `src/evaluation/metrics.py` | Funciones puras de T106 y T107. |
 | `src/cli.py::evaluate_cmd` | Punto de entrada de Typer: parsea flags, construye retrievers, imprime tabla y persiste JSON. |
 
-### Resultado de referencia (modo Booleano, 2026-05-11)
+### Resultado de referencia (corpus 957 destinos, queries_v2)
 
-Sobre el corpus actual (206 destinos, índice TF-IDF):
+Tras la expansión a 957 destinos y la regeneración del ground truth (`queries_v2.json`, 45 queries), las métricas se reportan sobre los tres modos. Los números clave que figuran en commits recientes:
 
-| Métrica | Valor |
-|---|---|
-| P@10 | 0.1136 |
-| R@10 | 0.2717 |
-| F1@10 | 0.1152 |
-| MAP | 0.2214 |
-| MRR | 0.3614 |
-| nDCG@10 | 0.2883 |
+| Métrica | Booleano | Semántico | Híbrido (α=0.4, con expansión bilingüe) |
+|---|---|---|---|
+| P@10 | 0.11 | 0.43 | **0.596** |
 
-Los valores bajos en P@k vs R@k son esperables porque varias queries por país (`country=Spain` → 48 relevantes) tienen ground truth mucho mayor que el `top_k=10` del runner. El nDCG por encima del 0.28 confirma que cuando el booleano acierta, los aciertos aparecen razonablemente arriba (rangos cercanos a 1-3). Estos números se compararán contra los modos semántico/híbrido en cuanto Qdrant esté materializado.
+El salto del híbrido (0.544 → 0.596) corresponde a la incorporación del módulo de expansión bilingüe (`src/retrieval/bilingual_query.py`), que reduce la asimetría entre queries en un idioma y descripciones en el otro. Los resultados completos por modo se regeneran con `python -m src.cli evaluate --queries data/eval/queries_v2.json` y quedan en `docs/figures/`.
 
 ---
 

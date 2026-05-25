@@ -176,8 +176,7 @@ python -m src.cli ingest wikivoyage   # genera destinations.jsonl y .db
 python -m src.cli build-index         # genera index.pkl
 ```
 
-Esto produce 206 destinos (Wikivoyage España) y un índice invertido con
-~4 100 términos.
+El bootstrap produce **957 destinos** (179 de Wikivoyage en inglés + 778 de Wikidata/Wikipedia en español) y un índice invertido con vocabulario amplio. Para Docker, este paso se ejecuta automáticamente desde el tab "Sistema" de la UI (ver capítulos 02 y 16).
 
 ### Pasos de la demo
 

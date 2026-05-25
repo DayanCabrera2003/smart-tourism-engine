@@ -339,9 +339,9 @@ Checklist pre-demo:
 
 - Abrir [docs/17_critica_y_deficiencias.md](17_critica_y_deficiencias.md).
 - Mencionar las tres limitaciones más relevantes:
-  1. Corpus mono-fuente (Wikivoyage en inglés, 206 destinos).
+  1. Corpus bi-fuente (957 destinos: Wikivoyage EN + Wikidata/Wikipedia ES); falta una tercera fuente con `reviews_count` para popularidad real.
   2. Imágenes no descargadas (multimodal funcional pero sin contenido real).
-  3. SQLite drift que la UI maneja con degradación elegante.
+  3. SQLite drift histórica, ahora cubierta por la fase `sqlite` del bootstrap que re-sincroniza desde el JSONL.
 - Resaltar las tres bondades técnicas:
   1. Modelo Booleano Extendido con `p` continuo y validado empíricamente.
   2. Separación de responsabilidades + 500+ tests pytest sin servicios externos.

@@ -77,7 +77,7 @@ Los seis perfiles sintéticos del módulo de recomendación (`mochilero`, `famil
 
 **Dentro del alcance:**
 
-- Corpus de destinos turísticos (200+ entries).
+- Corpus de destinos turísticos (**957 entradas**, ver capítulo 04 para fuentes).
 - Recuperación léxica, semántica e híbrida.
 - RAG con un LLM (Gemini) y fallback a Ollama local.
 - Búsqueda web fallback con Tavily.

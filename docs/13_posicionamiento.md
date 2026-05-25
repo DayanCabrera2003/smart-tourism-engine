@@ -35,10 +35,10 @@ La columna `popularity` se añade automáticamente vía `_ensure_popularity_colu
 
 ### Verificación contra el corpus real
 
-Con los 206 destinos de Wikivoyage, la distribución resultante encaja con la intuición turística:
+Con los 957 destinos del corpus actual (Wikivoyage + Wikidata/Wikipedia), la distribución resultante encaja con la intuición turística:
 
-- **Top**: Ho Chi Minh City, Turín, Madrid, París, Barcelona (descripciones largas y muy citadas por otras entradas).
-- **Bottom**: Bogotá, Cádiz, Gijón, Mérida, Cancún (descripciones de una sola línea sin menciones cruzadas).
+- **Top**: Iquitos (0.72), Lima (0.58), Roma (0.56), Jerusalén (0.50), Trujillo (0.48) — descripciones largas y muy citadas por otras entradas.
+- **Bottom**: Senai, Gurun, Ad-Dulayl, Ghawr ash-Shafi, Al-Mashariqah (popularidad 0.0) — destinos secundarios con descripciones muy cortas y sin menciones cruzadas en el resto del corpus.
 
 ### Decisiones de diseño
 
@@ -218,7 +218,7 @@ Se construye en una función pura para poder testearla sin Streamlit:
 
 - **Imports lazy de folium**: la app no debe romper en sistemas que solo corren tests/lint y no instalan `streamlit-folium`. Los imports están dentro de `_render_results_map`.
 - **Coordenadas como campos opcionales en `DestinationResult`**: con validación `[-90, 90]` para lat y `[-180, 180]` para lon. Resultados sin coordenadas (búsqueda web Tavily, destinos legacy) no rompen el mapa; simplemente quedan fuera de la capa de marcadores.
-- **Cobertura del corpus**: 179 de 206 destinos de Wikivoyage traen coordenadas (Wikivoyage no las expone para subdistritos y barrios). El 13% restante aparece en la lista lineal pero no en el mapa, lo cual la UI explicita en la caption.
+- **Cobertura del corpus**: 954 de 957 destinos traen coordenadas (99.7%). La fuente Wikidata expone latitud/longitud para casi todas sus entradas; solo 3 destinos legacy quedan fuera del mapa, lo cual la UI explicita en la caption.
 - **Sin layer extra de popularidad/frescura en el mapa**: el mapa no es el lugar para rankear; es el lugar para ubicar geográficamente. Mantenerlo simple evita iconos rojos/verdes que el usuario tiene que interpretar.
 
 

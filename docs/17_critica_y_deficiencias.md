@@ -44,13 +44,12 @@ Diecisiete capítulos `.md` cubren cada decisión técnica con su motivación, f
 
 ## Limitaciones
 
-### Corpus mono-fuente y mono-idioma
+### Corpus expandido pero con un único proveedor de popularidad
 
-Aunque la arquitectura prevé dos fuentes (Wikivoyage y OpenTripMap) y la documentación cubre la fusión con deduplicación por haversine, el corpus que se evalúa contiene **206 destinos solo de Wikivoyage**, todos en inglés. Esto tiene tres consecuencias:
+El corpus se amplió a **957 destinos** combinando dos fuentes: 179 entradas de Wikivoyage (texto en inglés) y 778 de Wikidata + Wikipedia ES (texto en español). Eso convirtió el corpus en bilingüe y eliminó el sesgo geográfico fuerte hacia España. La distribución actual no tiene un país que supere el 8% (top: Italia 7.7%, Polonia 5.7%, Egipto 5.5%, Malasia 5.4%). Persisten dos limitaciones reales:
 
-1. La popularidad se aproxima por longitud de descripción y menciones cruzadas porque no hay `reviews_count` ni una segunda fuente que confirme la notoriedad de un destino.
-2. Las queries en español dependen del embedder multilingüe (`all-MiniLM-L6-v2`) para puentear el gap. El recuperador léxico puro tiene desventaja inherente con queries en español sobre descripciones en inglés.
-3. El corpus tiene **sesgo geográfico**: 48 de 206 destinos son España (23%), 20 Italia, 20 Francia. La sección "Variados por país" del posicionamiento existe precisamente para contrarrestarlo en el output.
+1. La popularidad sigue derivada de la longitud de descripción y menciones cruzadas porque ninguna de las dos fuentes expone `reviews_count` ni similar. Una tercera fuente (OpenTripMap, TripAdvisor) cerraría esa carencia.
+2. La asimetría idiomática entre Wikivoyage (inglés) y Wikipedia ES (español) obliga al sistema a depender del embedder multilingüe (`intfloat/multilingual-e5-small`) y del módulo de expansión bilingüe (`src/retrieval/bilingual_query.py`) para puentear las queries que llegan en el idioma "equivocado" respecto al documento.
 
 ### Imágenes no descargadas
 
@@ -58,7 +57,7 @@ El módulo multimodal está implementado y testeado con stubs, pero el script de
 
 ### Tabla SQLite desincronizada
 
-`data/processed/destinations.jsonl` tiene 206 entradas; la tabla SQLite `destinations` solo tiene 1 fila (residuo de un test antiguo). La UI degrada elegantemente (popularity, country y lat/lon en `null`) en el tab de búsqueda, pero la demo pide re-ingestar a SQLite. Esto se planificó como acción de data engineering pendiente de aprobación humana en lugar de incluirlo silenciosamente en una tarea de código.
+`data/processed/destinations.jsonl` tiene 957 entradas. La tabla SQLite quedó históricamente desincronizada (1 fila residual) y eso degradaba la respuesta del endpoint léxico (sin metadata). La fase `sqlite` del pipeline de bootstrap (ver capítulo 02) re-upserta el JSONL completo en cada arranque para evitar esta deriva. Tras un bootstrap completo, SQLite refleja exactamente el JSONL.
 
 ### Métricas todavía parciales
 
@@ -131,6 +130,6 @@ El mapa centra automáticamente en el centroide de los resultados. Para corpora 
 
 ## Limitaciones que no son resolvibles dentro del alcance
 
-- **Corpus pequeño**: 206 destinos es mucho para tests, poco para diferencias estadísticamente significativas entre modos. Un corpus de 10,000+ requeriría infraestructura distinta (Qdrant en producción, índice TF-IDF persistido en disco, evaluación por batches).
+- **Corpus medio**: 957 destinos es suficiente para entrenar y demostrar el sistema, pero todavía corto para diferencias estadísticamente significativas entre modos de recuperación en evaluaciones largas. Un corpus de 10 000+ requeriría infraestructura distinta (Qdrant en producción, índice TF-IDF persistido en disco, evaluación por batches).
 - **LLM en cloud**: Gemini es un servicio externo con cuota y latencia variable. Para una demo crítica habría que asumir Ollama local con un modelo abierto, lo cual cambia las capacidades del RAG.
 - **Sin login**: el producto es demo, no servicio. Añadir cuentas reales abre un eje (auth, sesiones, perfiles persistidos) que no estaba en el alcance.
