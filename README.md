@@ -50,7 +50,21 @@ El informe completo vive en [docs/](docs/). El índice principal está en [docs/
 
 ---
 
-## Instalación
+## Despliegue rápido con Docker (recomendado para la entrega)
+
+```bash
+git clone <url-del-repositorio>
+cd smart-tourism-engine
+cp .env.example .env             # editar LLM_API_KEY (Gemini) y, opcional, TAVILY_API_KEY
+docker compose build             # ~3-5 min la primera vez
+docker compose up -d
+```
+
+Abrir `http://localhost:8501`. Si la UI muestra el banner "Sistema no inicializado", ir al tab **Sistema** y pulsar **Inicializar sistema**. La pipeline arranca crawler + ingest + indexación + embeddings con progreso visible en pantalla. El mismo tab expone los botones **Limpiar índices** y **Limpiar TODO** para resetear el sistema antes de grabar el video de defensa (requisito del enunciado).
+
+Documentación completa del despliegue, incluida la rotación de datos y la operación del stack: [docs/15_despliegue.md](docs/15_despliegue.md).
+
+## Instalación (modo desarrollo)
 
 ### 1. Requisitos
 
