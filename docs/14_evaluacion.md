@@ -70,7 +70,7 @@ Las queries por país son intencionalmente "fáciles" — sirven como sanity che
 
 ### Estado de validación
 
-El campo `review_status: "pending_human_validation"` señala que las anotaciones se generaron algorítmicamente y deberían revisarse a mano antes de la defensa final. Editar `data/eval/queries.json` directamente es seguro; el script se re-ejecuta solo cuando se quiere regenerar todo desde reglas.
+`queries_v2.json` (45 queries, corpus 957) tiene `review_status: "regenerated_for_expanded_corpus"`: las anotaciones se regeneraron algorítmicamente sobre el corpus expandido y se revisaron a mano para los casos límite (queries por país que crecieron de 48 destinos relevantes en v1 a más de 70 en v2). `queries.json` v1 se conserva como referencia histórica del corte 1.
 
 ### Limitaciones declaradas
 
