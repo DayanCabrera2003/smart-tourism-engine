@@ -327,3 +327,42 @@ La lógica está en `src/retrieval/positioning.py` y en `build_positioning_secti
 ## T104 — Mapa interactivo
 
 Otro toggle del tab de búsqueda renderiza un mapa Folium con los destinos geocodificados. Coordenadas vienen de `DestinationResult.latitude/longitude` que el backend popula desde SQLite. Si SQLite no tiene las coords, el mapa muestra "Ninguno de los resultados tiene coordenadas".
+
+## Tab "Sistema" — bootstrap y limpieza de datos
+
+El último tab de la UI (`render_bootstrap_tab` en `src/ui/bootstrap_panel.py`) cubre dos necesidades operativas que el enunciado de la entrega exige explícitamente: poder inicializar el sistema desde cero y poder borrar los datos antes de grabar el video de defensa.
+
+### Componentes
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Estado del sistema                                       │
+│ [✓ Sistema listo]  o  [⚠ Sistema no inicializado]        │
+│                                                          │
+│ [si está corriendo: barra de progreso fase X/8, mensaje] │
+│ [si terminó: log de últimas líneas en un expander]       │
+│                                                          │
+│ ─────────────── Acciones ───────────────                 │
+│  Inicializar         Limpiar índices       Limpiar TODO  │
+│  [Inicializar sis.]  [✓ Confirmo]          [BORRAR____]  │
+│                      [Limpiar índices]     [Limpiar todo]│
+└──────────────────────────────────────────────────────────┘
+```
+
+- **Estado del sistema** lee `GET /bootstrap/needed`. Si `true`, muestra warning y un banner cruza-tabs aparece en todas las demás vistas para invitar al usuario al tab Sistema.
+- **Barra de progreso** se alimenta de `GET /bootstrap/status` y se auto-refresca cada 2 segundos vía `time.sleep + st.rerun()` mientras el campo `status` esté en `running`. Las fases completadas se marcan `[OK]`, la actual `[..]`, las pendientes `[  ]`.
+- **Log circular** (últimas 15 líneas con timestamp) ayuda a diagnosticar si la fase de embed se atascó o si una página de Wikivoyage falló.
+- **Botones de acción**: tres columnas con confirmación escalonada según la destructividad:
+
+| Botón | Confirmación | API | Tiempo típico |
+|---|---|---|---|
+| **Inicializar sistema** | Click directo | `POST /bootstrap/start` | 5-30 min |
+| **Limpiar índices** | Checkbox "Confirmo" | `POST /bootstrap/reset/indexes` | <1 s |
+| **Limpiar TODO** | Input que requiere escribir `BORRAR` | `POST /bootstrap/reset/all` | <1 s |
+
+### Decisiones de diseño
+
+- **Confirmación asimétrica por riesgo**: la diferencia entre "limpiar índices" y "limpiar todo" es la pérdida del corpus raw (recuperarlo lleva 25 minutos de crawl). La barrera doble del input `BORRAR` evita que un click distraído en la defensa borre el corpus al medio de la presentación.
+- **Polling explícito en lugar de WebSocket**: Streamlit no soporta WebSocket bidireccional sin componentes custom; el patrón `time.sleep(2) + st.rerun()` es nativo y suficiente para una barra de progreso que cambia cada pocos segundos.
+- **Panel separado del resto del app.py**: el módulo `bootstrap_panel.py` es la única pieza de UI que importa endpoints administrativos. Mantenerlo aparte respeta la regla de una responsabilidad por archivo del `CLAUDE.md` del proyecto y permite testearlo de forma independiente.
+- **Banner cruza-tabs**: si el sistema no está listo, ningún tab debería intentar buscar (la API devolvería 503). El banner persistente recuerda al usuario que el primer paso es el bootstrap.
