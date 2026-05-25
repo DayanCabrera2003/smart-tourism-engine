@@ -6,15 +6,17 @@ Esta sección describe la arquitectura técnica del Smart Tourism Engine, los m�
 
 ## Estructura de Módulos (src/)
 
-- **ingestion/**: Adquisición de datos desde fuentes externas (Wikivoyage, OpenTripMap), normalización y almacenamiento inicial.
+- **ingestion/**: Adquisición de datos desde fuentes externas (Wikivoyage, Wikidata/Wikipedia, OpenTripMap), normalización y almacenamiento inicial.
 - **indexing/**: Preprocesamiento de texto (tokenización, stemming) y construcción del índice invertido y embeddings.
-- **retrieval/**: Lógica de búsqueda principal (Booleano Extendido, semántica e híbrida).
+- **retrieval/**: Lógica de búsqueda principal (Booleano Extendido, semántica e híbrida) más módulos auxiliares (expansión bilingüe, cross-encoder rerank, filtro geográfico, popularidad, frescura, MMR).
 - **rag/**: Integración con LLM para generación de respuestas contextualizadas basadas en los resultados de búsqueda.
 - **web_search/**: Módulo de fallback para búsquedas en la web cuando la información local es insuficiente.
 - **multimodal/**: Soporte para búsqueda por imágenes y embeddings CLIP.
 - **recommendation/**: Algoritmos de recomendación personalizados para los usuarios.
+- **evaluation/**: Métricas P@k, R@k, F1@k, MAP, MRR y nDCG@k sobre el ground truth de `data/eval/queries_v2.json`.
+- **bootstrap/**: Pipeline reproducible que lleva el sistema desde "data/ vacío" hasta "indexes listos" en una operación monitorizada (ver sección dedicada más abajo).
 - **api/**: Definición de rutas FastAPI, esquemas y lógica de servidor.
-- **ui/**: Implementación de la interfaz de usuario con Streamlit.
+- **ui/**: Implementación de la interfaz de usuario con Streamlit, incluido el tab "Sistema" que dispara el bootstrap pipeline.
 
 ## Persistencia: SQLite vs Qdrant
 
@@ -60,13 +62,24 @@ El `id` de cada destino es la clave primaria en SQLite y el `id` del punto en Qd
 
 La aplicación FastAPI vive en `src/api/main.py` y se arranca con `uvicorn src.api.main:app --reload`.
 
-| Método | Ruta      | Descripción                                                                 | Respuesta                 |
-|--------|-----------|-----------------------------------------------------------------------------|---------------------------|
-| GET    | `/health` | Sonda de disponibilidad del servicio (liveness probe).                      | `{"status": "ok"}` (200)  |
-| POST   | `/search` | Recupera destinos aplicando el Booleano Extendido (p-norm) sobre el índice. | `SearchResponse` (200)    |
-| POST   | `/ask`    | Pregunta en lenguaje natural → respuesta RAG completa (T065).               | `AskResponse` (200)       |
-| POST   | `/ask/stream` | Igual que `/ask` pero en streaming SSE (T069).                          | `text/event-stream` (200) |
-| POST   | `/recommend` | Recomienda destinos según un perfil de usuario (T096).                   | `RecommendResponse` (200) |
+| Método | Ruta | Descripción | Respuesta |
+|--------|------|-------------|-----------|
+| GET    | `/health` | Sonda de disponibilidad (liveness probe). | `{"status": "ok"}` (200) |
+| POST   | `/search` | Booleano Extendido (p-norm) sobre el índice invertido. | `SearchResponse` (200) |
+| POST   | `/search/semantic` | Embeddings densos en Qdrant; opción de cross-encoder. | `SearchResponse` (200) |
+| POST   | `/search/hybrid` | Mezcla Booleano + semántico con peso `alpha` (default 0.4). | `SearchResponse` (200) |
+| POST   | `/search/image-by-text` | CLIP text-to-image sobre `destinations_image`. | `ImageSearchResponse` (200) |
+| POST   | `/search/by-image` | CLIP image-to-image (multipart upload). | `ImageSearchResponse` (200) |
+| POST   | `/search/multimodal` | Texto + imagen opcional, fusión con peso `alpha`. | `ImageSearchResponse` (200) |
+| POST   | `/ask` | Pregunta natural → respuesta RAG con citas. | `AskResponse` (200) |
+| POST   | `/ask/stream` | Igual que `/ask` pero en streaming SSE. | `text/event-stream` (200) |
+| POST   | `/recommend` | Destinos según perfil sintético + intereses + historial. | `RecommendResponse` (200) |
+| POST   | `/feedback` | Voto thumbs up/down por (user_id, query, destination_id). | `FeedbackResponse` (200) |
+| GET    | `/bootstrap/needed` | ¿El sistema necesita inicialización? | `NeededResponse` (200) |
+| GET    | `/bootstrap/status` | Snapshot del progreso del pipeline (fase, %, log). | `StatusResponse` (200) |
+| POST   | `/bootstrap/start` | Arranca el pipeline en thread de background. | `StartResponse` (200) |
+| POST   | `/bootstrap/reset/indexes` | Borra colecciones Qdrant + `index.pkl`. | `ResetResponse` (200) |
+| POST   | `/bootstrap/reset/all` | Borra colecciones + index + JSONL + SQLite + raw. | `ResetResponse` (200) |
 
 ### `POST /search` (T040)
 
@@ -179,6 +192,56 @@ Decisiones de diseño:
 - **El `.dockerignore`** excluye `venv/`, `data/`, `qdrant_storage/`, `docs/`, `tests/` y demás artefactos que no son necesarios en runtime, manteniendo la imagen alrededor de los 3 GB en disco (817 MB el manifiesto final).
 
 El despliegue completo está documentado en el capítulo 15 (`docs/15_despliegue.md`), incluyendo los pasos de `docker compose build`, `up`, `logs`, `down`, y la inicialización del corpus desde la UI.
+
+## Pipeline de bootstrap
+
+El enunciado de la entrega exige que "todos los datos almacenados se eliminen y la carga del sistema indexe su corpus inicial como un paso requerido". Para cumplirlo el sistema incluye un pipeline reproducible (`src/bootstrap/`) expuesto vía API y vía UI.
+
+### Diseño
+
+El paquete `src/bootstrap/` se separa en tres responsabilidades:
+
+| Módulo | Responsabilidad |
+|---|---|
+| `state.py` | `BootstrapTracker` thread-safe que mantiene fase actual, mensaje, log circular de 30 líneas y porcentaje. Singleton por proceso. |
+| `reset.py` | Dos funciones puras: `reset_indexes()` (drop Qdrant + `index.pkl`) y `reset_all()` (lo anterior + JSONL + SQLite + `data/raw/`). Qdrant se limpia vía HTTP, nunca borrando `qdrant_storage/` desde el host. |
+| `pipeline.py` | `run(tracker, on_done)` que ejecuta las ocho fases en secuencia. `run_in_thread()` envuelve el call para que la API responda durante los 5-30 minutos del embed/crawl. |
+
+### Fases
+
+| # | Fase | Detalle |
+|---|------|---------|
+| 1 | `detect` | Verifica si existen `data/raw/wikivoyage/` y `data/processed/destinations.jsonl` para decidir qué fases saltar. |
+| 2 | `crawl` | Solo si no hay raw: descarga ~250 páginas de Wikivoyage con rate limit (REQUEST_DELAY_SECONDS) y respeto a robots.txt. Reporta progreso página a página. |
+| 3 | `ingest` | Solo si no hay JSONL: parsea raw → `destinations.jsonl` + upsert en SQLite (vía `src/ingestion/pipeline.py`). |
+| 4 | `sqlite` | **Sincronización idempotente del catálogo**: re-upserta todas las filas del JSONL. Cubre el caso en que el JSONL ya existía pero la SQLite se quedó desincronizada (problema histórico documentado en el capítulo 17). |
+| 5 | `index` | Construye el índice invertido y lo persiste en `data/processed/index.pkl`. |
+| 6 | `popularity` | Recalcula `popularity` para todo el corpus (`scripts/compute_popularity.py`) y actualiza JSONL + SQLite. |
+| 7 | `qdrant` | Crea (idempotente) la colección `destinations_text` con `vector_size=384`, `distance=Cosine`. |
+| 8 | `embed` | Recorre el JSONL embebiendo por lotes de 32 y subiendo a Qdrant. Reporta cada batch. |
+
+### Endpoints
+
+Los cinco endpoints `/bootstrap/*` (ver tabla anterior) cubren los tres casos de uso:
+
+1. **¿Debo inicializar?** `GET /bootstrap/needed` chequea presencia del JSONL, del índice y del conteo de puntos en Qdrant.
+2. **Inicializar.** `POST /bootstrap/start` lanza el pipeline en thread. `GET /bootstrap/status` se polea cada ~2 s para mostrar la barra de progreso.
+3. **Limpiar.** `POST /bootstrap/reset/indexes` o `/reset/all` para los dos escenarios de cleanup.
+
+### Invalidación de cachés
+
+`src/api/main.py` mantiene singletons con `@lru_cache(maxsize=1)` para el índice, las destinations de SQLite, el embedder, el cliente Qdrant y la pipeline RAG. Tras un bootstrap o un reset el router (`src/api/bootstrap_router.py`) dispara un callback que limpia las ocho cachés, garantizando que la próxima petición reconstruya los handles contra el estado nuevo en disco. Sin esta invalidación, la API serviría el índice viejo aunque Qdrant ya tuviera los vectores nuevos.
+
+### Integración con la UI
+
+El tab "Sistema" de Streamlit (`src/ui/bootstrap_panel.py`) consume `/bootstrap/*` para mostrar:
+
+- Banner persistente cuando `needed=true` en cualquier tab.
+- Barra de progreso con porcentaje, fase actual y log circular.
+- Auto-refresh cada 2 segundos mientras `status="running"`.
+- Tres botones: **Inicializar sistema** (verde), **Limpiar índices** (requiere checkbox de confirmación), **Limpiar todo** (requiere escribir `BORRAR` para evitar accidentes).
+
+Este componente está descrito en el capítulo 12.
 
 ## Estrategia de Testing
 
