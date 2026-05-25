@@ -336,16 +336,16 @@ VectorStore.search(
 
 ### Booleano Extendido (`/search`) vs semántico (`/search/semantic`)
 
-| Aspecto | `/search` (Booleano Extendido p-norm) | `/search/semantic` (Qdrant + MiniLM) |
+| Aspecto | `/search` (Booleano Extendido p-norm) | `/search/semantic` (Qdrant + e5-small) |
 |---------|---------------------------------------|--------------------------------------|
 | Representación de la query | AST de operadores AND/OR sobre tokens | Vector denso `ℝ³⁸⁴` normalizado |
-| Representación del documento | Postings TF-IDF normalizados por término | Embedding del texto `"{name}. {description}"` |
+| Representación del documento | Postings TF-IDF normalizados por término | Embedding del texto `"{name}. {country}. {description}"` |
 | Score | Norma-p combinando pesos por término ∈ [0, 1] | Similitud coseno ∈ [-1, 1] (clamped a [0, 1]) |
 | Coincidencia léxica exacta | Sí (vía stemming Snowball) | Sólo si el modelo aprendió la asociación |
 | Sinónimos / paráfrasis | No (`"playa"` y `"costa"` son términos distintos) | Sí (vectores cercanos en el espacio latente) |
-| Multilingüe | Sólo si el corpus comparte el idioma del query | Sí, MiniLM mantiene proximidad ES↔EN para conceptos comunes |
+| Multilingüe | Sólo si el corpus comparte el idioma del query | Sí, e5-small cubre 100 idiomas y mantiene proximidad ES↔EN |
 | Operadores explícitos | AND/OR/NOT con precedencia | Ninguno; la intención se infiere del embedding |
-| Coste por consulta | O(\|términos\| · \|postings\|) en RAM | 1 forward del modelo (~ms en CPU) + ANN en Qdrant |
+| Coste por consulta | O(\|términos\| · \|postings\|) en RAM | 1 forward del modelo (~16-30 ms en CPU) + ANN en Qdrant |
 | Dependencias en runtime | Pickle del índice invertido | Modelo `sentence-transformers` + servicio Qdrant |
 | Falla suave | Devuelve top-k aunque sólo un término aparezca | Siempre devuelve `top_k` (incluso si la similitud es baja) |
 | Idoneidad | Consultas con vocabulario controlado o booleanas | Lenguaje natural, sinónimos, descripciones libres |
@@ -383,7 +383,7 @@ final(d) = α · score_léxico(d) + (1 - α) · score_semántico(d)
 
 - `α = 1.0` → solo Booleano Extendido (equivalente a `/search`).
 - `α = 0.0` → solo semántico (equivalente a `/search/semantic`).
-- `α = 0.5` (por defecto) → mezcla balanceada.
+- `α = 0.4` (por defecto) → la rama semántica pesa más que la léxica. El valor original era 0.5 pero se ajustó a 0.3 (commit 2021fb5) y luego a 0.4 tras incorporar la expansión bilingüe, en ambos casos justificado por el barrido de evaluación contra `queries_v2.json`.
 
 Ambos scores viven en `[0, 1]` antes de la fusión: el léxico lo garantiza la
 norma-p (Salton, Fox & Wu, 1983) y el coseno de Qdrant se recorta a `[0, 1]`
@@ -425,7 +425,7 @@ hybrid = HybridRetriever(
     embedder=TextEmbedder(),
     store=VectorStore(),
     collection="destinations_text",
-    alpha=0.5,
+    alpha=0.4,
 )
 hits = hybrid.search("playas tranquilas", index, top_k=10)
 # → [("wikivoyage-varadero", 0.83), ...]
@@ -452,7 +452,7 @@ La tabla siguiente recoge cinco queries de prueba para el endpoint
 `POST /search/semantic`.  En el entorno de pruebas se usa un embedder
 determinista y un `VectorStore` en memoria; en producción el test de humo
 manual verifica que el modelo real devuelve los destinos esperados del corpus
-de Wikivoyage-España (200+ destinos).
+actual (957 destinos).
 
 | # | Query | Resultado esperado (top-1) | Justificación semántica |
 |---|-------|---------------------------|-------------------------|
@@ -474,5 +474,44 @@ inyectado vía `dependency_overrides`:
 - La descripción se enriquece desde el mapa de metadatos de `destinations.db`.
 - Se valida el rango `top_k ∈ [1, 100]` y que la query no esté vacía.
 
-Los tests de producción (queries reales sobre Wikivoyage-España) se ejecutan
+Los tests de producción (queries reales sobre el corpus actual) se ejecutan
 manualmente con Qdrant levantado y el corpus completo indexado (ver T060).
+
+---
+
+## Módulos auxiliares introducidos tras el corpus bilingüe
+
+Cuando el corpus pasó de 206 destinos monolingües a 957 bilingües (cap 04), tres problemas se manifestaron y motivaron módulos nuevos en `src/retrieval/`.
+
+### Expansión bilingüe de consultas (`bilingual_query.py`)
+
+`expand_query(text)` agrega al final de la consulta los sinónimos turísticos en el idioma opuesto, leyendo de un diccionario curado de ~70 términos (`playa↔beach`, `montaña↔mountain`, `museo↔museum`, etc.). Se aplica antes de embeber en `/search/semantic` y `/search/hybrid`, y antes de tokenizar en el rerank léxico del híbrido.
+
+**Motivación:** las queries del usuario llegan típicamente en español, pero el 19% del corpus está en inglés (Wikivoyage). Sin expansión, el embedder e5-small recuperaba inglés solo si el destino tenía descripción larga en su versión hispana también. Con expansión, las dos descripciones quedan al alcance del mismo coseno.
+
+**Impacto medido (commit 73e5bb3):** P@10 del híbrido sube de 0.544 a **0.596** sobre `queries_v2.json` (corpus 957).
+
+### Filtro geográfico (`geo_filter.py`)
+
+`detect_countries(query)` reconoce nombres de país y adjetivos gentilicios (`"cuba" → "Cuba"`, `"italianas" → "Italy"`). Cuando una query menciona un país, el endpoint correspondiente sobre-pidiendo `fetch_k=200` (en vez del usual `top_k · 3`) y luego `apply_country_filter` descarta los hits que no coinciden.
+
+**Motivación:** consultas como `"playas en Cuba"` traían destinos cubanos en posiciones 20-30 del ranking semántico porque destinos de otros países con descripciones más ricas dominaban el coseno. El sobre-fetch + filtro garantiza que cuando el usuario es explícito sobre el país, el sistema lo respete.
+
+### Cross-encoder reranker opcional (`cross_encoder_reranker.py`)
+
+`CrossEncoderReranker` envuelve el modelo `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`, un re-ranker multilingüe que califica pares (query, texto) con un escalar `[0, 1]` calibrado. Se aplica solo sobre los `top_n=50` candidatos del ranking semántico/híbrido y su score se **mezcla** con el bi-encoder (blend=0.5) en vez de reemplazarlo.
+
+**Motivación y por qué está OFF por defecto:** la sustitución pura del bi-encoder por el cross-encoder degradaba P@10 y nDCG@10 sobre `queries_v2.json` porque el cross-encoder multilingüe no respetaba consistentemente las intenciones geográficas (`"playas italianas"` vs `"Italy"`). El blend mantiene la señal geográfica del bi-encoder y deja que el cross refine empates. El flag `use_reranker` quedó con default `False` (commit 3d1ca2d) para no degradar la métrica reportada en el corte; el usuario puede activarlo per-request para consultas complejas.
+
+### Wiring en los endpoints
+
+Las tres mejoras se aplican en cadena dentro de `src/api/main.py`:
+
+1. `detect_countries(query)` → decide `fetch_k`.
+2. `expand_query(query)` → entra al embedder y al recuperador léxico.
+3. Recuperación normal de la rama léxica y/o semántica.
+4. `apply_country_filter` o `filter_search_hits` si hubo detección.
+5. `_maybe_cross_encode` (cross-encoder con blend, si `use_reranker=True`).
+6. `_maybe_rerank` (popularidad + frescura del capítulo 13, si `use_reranker=True`).
+
+El orden importa: la expansión bilingüe corre antes del retrieval para que tanto el embedding como el postings list usen la query enriquecida; el geo filter corre después del retrieval (no antes, porque eliminaría candidatos antes de saber su país); y los rerankers cierran la cadena porque operan sobre la lista ya filtrada.
