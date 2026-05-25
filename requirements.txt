@@ -12,6 +12,8 @@ matplotlib
 prometheus-client
 qdrant-client
 sentence-transformers
+sqlalchemy
+nltk
 lingua-language-detector
 python-multipart
 pillow

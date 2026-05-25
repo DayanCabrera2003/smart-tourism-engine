@@ -1,0 +1,51 @@
+# Virtualenv y caches locales
+venv/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Datos y artefactos pesados (se montan como volumen)
+data/
+qdrant_storage/
+docs/figures/
+
+# Git y CI
+.git/
+.github/
+.gitignore
+.pre-commit-config.yaml
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Documentacion (no necesaria en runtime)
+docs/
+plan_proyecto_sri_turismo.md
+GEMINI.md
+CLAUDE.md
+*.md
+!README.md
+Info De Entrega/
+LICENSE
+
+# Secretos
+.env
+.env.local
+
+# Tests (no se ejecutan en el contenedor de runtime)
+tests/
+
+# Egg-info y build
+*.egg-info/
+build/
+dist/
+
+# Logs
+*.log

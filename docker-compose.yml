@@ -1,0 +1,88 @@
+# Smart Tourism Engine - orquestacion completa para defensa y entrega.
+#
+# Servicios:
+#   qdrant : base vectorial (puerto 6333 HTTP, 6334 gRPC)
+#   api    : FastAPI/uvicorn (puerto 8000)
+#   ui     : Streamlit (puerto 8501, unico que el usuario abre en el navegador)
+#
+# Volumenes con bind-mount al host:
+#   ./data            -> /app/data            (corpus + indices + SQLite)
+#   ./qdrant_storage  -> /qdrant/storage      (puntos vectoriales persistentes)
+#   hf_cache          -> /cache/huggingface   (pesos de e5-small y CLIP)
+#
+# Uso:
+#   docker compose up -d              # arranca todo
+#   docker compose logs -f api ui     # sigue logs
+#   docker compose exec api bash      # shell para correr CLI / scripts
+#   docker compose down               # detiene y borra contenedores (mantiene volumenes)
+#   docker compose down -v            # borra ademas el cache de modelos
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    pull_policy: missing
+    container_name: ste-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    # Qdrant ship sin curl/wget/bash, asi que el healthcheck propio no es viable.
+    # El API tiene su propio healthcheck y reintenta la conexion contra Qdrant.
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ste-app:latest
+    container_name: ste-api
+    restart: unless-stopped
+    depends_on:
+      qdrant:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      DATA_DIR: /app/data
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - hf_cache:/cache/huggingface
+    command: ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  ui:
+    image: ste-app:latest
+    container_name: ste-ui
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      SMART_TOURISM_API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - hf_cache:/cache/huggingface
+    command:
+      - streamlit
+      - run
+      - src/ui/app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+      - --browser.gatherUsageStats=false
+
+volumes:
+  hf_cache:
+    name: ste_hf_cache
