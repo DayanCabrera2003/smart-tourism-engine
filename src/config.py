@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # Maximo de llamadas a Tavily por minuto (T079)
     TAVILY_RATE_LIMIT_PER_MINUTE: int = 20
 
+    # Umbral de relevancia (cross-encoder, [0,1]) por debajo del cual una
+    # busqueda dispara el fallback web. El cross-encoder sigmoid da scores
+    # muy bajos a pares irrelevantes; 0.10 separa "Hoteles en alaska" (sin
+    # corpus) de queries con resultados validos. Requiere calibracion.
+    WEB_FALLBACK_RELEVANCE_THRESHOLD: float = 0.10
+
     # Nivel de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     LOG_LEVEL: str = "INFO"
 
