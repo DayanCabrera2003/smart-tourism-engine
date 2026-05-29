@@ -224,6 +224,24 @@ def get_embedder() -> TextEmbedder:
 
 
 @lru_cache(maxsize=1)
+def _default_web_client():
+    """Singleton del cliente Tavily. None si no hay TAVILY_API_KEY."""
+    if not settings.TAVILY_API_KEY:
+        return None
+    from src.web_search.tavily import TavilyClient
+
+    return TavilyClient(
+        settings.TAVILY_API_KEY,
+        max_calls_per_minute=settings.TAVILY_RATE_LIMIT_PER_MINUTE,
+    )
+
+
+def get_web_client():
+    """Provee el cliente Tavily (o None). Inyectable en tests."""
+    return _default_web_client()
+
+
+@lru_cache(maxsize=1)
 def _default_rag_pipeline() -> "RagPipeline":
     from src.rag.llm_client import LLMClient
     from src.rag.pipeline import RagPipeline
@@ -235,14 +253,6 @@ def _default_rag_pipeline() -> "RagPipeline":
         ollama_model=settings.OLLAMA_MODEL,
     )
 
-    web_client = None
-    if settings.TAVILY_API_KEY:
-        from src.web_search.tavily import TavilyClient
-        web_client = TavilyClient(
-            settings.TAVILY_API_KEY,
-            max_calls_per_minute=settings.TAVILY_RATE_LIMIT_PER_MINUTE,
-        )
-
     return RagPipeline(
         index=_load_index_from_disk(),
         embedder=_default_embedder(),
@@ -250,7 +260,7 @@ def _default_rag_pipeline() -> "RagPipeline":
         collection=DEFAULT_COLLECTION,
         destinations=_load_destinations_from_disk(),
         llm=llm,
-        web_client=web_client,
+        web_client=_default_web_client(),
     )
 
 
