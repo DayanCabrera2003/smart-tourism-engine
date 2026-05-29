@@ -58,7 +58,7 @@ from src.indexing.embed_destinations import DEFAULT_COLLECTION
 from src.indexing.embedder import TextEmbedder
 from src.indexing.inverted_index import InvertedIndex
 from src.indexing.vector_store import VectorStore
-from src.retrieval.bilingual_query import expand_query
+from src.retrieval.bilingual_query import expand_query, expand_query_boolean
 from src.retrieval.extended_boolean import ExtendedBoolean
 from src.retrieval.freshness import freshness_score
 from src.retrieval.geo_filter import (
@@ -69,10 +69,29 @@ from src.retrieval.geo_filter import (
 from src.retrieval.hybrid import HybridRetriever
 from src.retrieval.reranker import Reranker
 
+import threading as _threading
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(app):
+    # Pre-warm heavy singletons in background so the first user request
+    # does not hit a cold-start timeout.
+    def _warmup():
+        try:
+            _default_clip_embedder()
+        except Exception:
+            pass
+
+    _threading.Thread(target=_warmup, daemon=True).start()
+    yield
+
+
 app = FastAPI(
     title="Smart Tourism Engine API",
     description="API de recuperación de información turística.",
     version="0.1.0",
+    lifespan=_lifespan,
 )
 middleware.install(app)
 
@@ -446,7 +465,7 @@ def search(
     # correct destinations even when the lexical retriever ranks them
     # far down. Otherwise the default 3x over-fetch is enough.
     fetch_k = 200 if detect_countries(request.query) else max(request.top_k * 3, 30)
-    hits = retriever.search(request.query, index, top_k=fetch_k)
+    hits = retriever.search(expand_query_boolean(request.query), index, top_k=fetch_k)
     hits_with_country = [
         (doc_id, score, (destinations.get(doc_id) or {}).get("country"))
         for doc_id, score in hits
