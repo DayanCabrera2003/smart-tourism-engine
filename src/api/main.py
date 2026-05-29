@@ -68,6 +68,8 @@ from src.retrieval.geo_filter import (
 )
 from src.retrieval.hybrid import HybridRetriever
 from src.retrieval.reranker import Reranker
+from src.web_search.fallback import run_web_fallback
+from src.web_search.trigger import should_fallback_by_relevance
 
 import threading as _threading
 from contextlib import asynccontextmanager
@@ -533,6 +535,7 @@ SemanticCollectionDep = Annotated[str, Depends(get_semantic_collection)]
 
 
 CrossEncoderDep = Annotated[object, Depends(get_cross_encoder)]
+WebClientDep = Annotated[object, Depends(get_web_client)]
 
 
 @app.post("/search/semantic", response_model=SearchResponse)
@@ -543,6 +546,7 @@ def search_semantic(
     collection: SemanticCollectionDep,
     destinations: DestinationsDep,
     cross_encoder: CrossEncoderDep,
+    web_client: WebClientDep,
 ) -> SearchResponse:
     """Búsqueda semántica (T053): embebe la query y consulta Qdrant directamente.
 
@@ -582,6 +586,26 @@ def search_semantic(
         str(payload.get("slug") or point_id): payload
         for point_id, _score, payload in filtered
     }
+    # Web fallback gate: same cross-encoder relevance signal as the hybrid
+    # endpoint. The bi-encoder cosine over-scores topically-similar but
+    # geographically-wrong destinations; the cross-encoder catches it.
+    relevance = _max_cross_encoder_relevance(
+        request.query, semantic_pairs, destinations, cross_encoder
+    )
+    if web_client is not None and should_fallback_by_relevance(
+        semantic_pairs,
+        relevance,
+        relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
+    ):
+        semantic_pairs = run_web_fallback(
+            request.query,
+            semantic_pairs,
+            web_client=web_client,
+            embedder=embedder,
+            store=store,
+            collection=collection,
+            destinations=destinations,
+        )
     # Cross-encoder runs first so its calibrated relevance feeds the
     # popularity/freshness reranker downstream.
     semantic_pairs = _maybe_cross_encode(
@@ -616,6 +640,7 @@ def search_hybrid(
     retriever_factory: RetrieverFactoryDep,
     destinations: DestinationsDep,
     cross_encoder: CrossEncoderDep,
+    web_client: WebClientDep,
 ) -> SearchResponse:
     """Búsqueda híbrida (T055): Booleano Extendido + semántico con peso alpha.
 
@@ -645,6 +670,27 @@ def search_hybrid(
         hits_with_country, request.query, country_getter=lambda h: h[2]
     )
     pairs = [(doc_id, score) for doc_id, score, _ in filtered]
+    # Web fallback gate: the cross-encoder's calibrated relevance, not the
+    # fused cosine, decides whether the local results are good enough. When
+    # even the best candidate is irrelevant (e.g. "hoteles en alaska" with no
+    # Alaska in the corpus) we bring in web results instead.
+    relevance = _max_cross_encoder_relevance(
+        request.query, pairs, destinations, cross_encoder
+    )
+    if web_client is not None and should_fallback_by_relevance(
+        pairs,
+        relevance,
+        relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
+    ):
+        pairs = run_web_fallback(
+            request.query,
+            pairs,
+            web_client=web_client,
+            embedder=embedder,
+            store=store,
+            collection=collection,
+            destinations=destinations,
+        )
     # Cross-encoder runs first so its calibrated relevance feeds the
     # popularity/freshness reranker downstream.
     pairs = _maybe_cross_encode(
