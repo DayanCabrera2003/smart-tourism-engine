@@ -31,6 +31,9 @@ from typing import TYPE_CHECKING, Annotated
 if TYPE_CHECKING:
     from src.rag.pipeline import RagPipeline
 
+import threading as _threading
+from contextlib import asynccontextmanager
+
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -70,9 +73,6 @@ from src.retrieval.hybrid import HybridRetriever
 from src.retrieval.reranker import Reranker
 from src.web_search.fallback import run_web_fallback
 from src.web_search.trigger import should_fallback_by_relevance
-
-import threading as _threading
-from contextlib import asynccontextmanager
 
 
 @asynccontextmanager
