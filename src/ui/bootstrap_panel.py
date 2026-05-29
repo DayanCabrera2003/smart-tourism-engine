@@ -169,7 +169,7 @@ def render_bootstrap_tab(st, api_url: str) -> None:
                     "Indices borrados: "
                     + ", ".join(payload.get("collections_dropped", []) or ["(ninguno)"])
                 )
-                st.session_state["confirm_indexes"] = False
+                st.session_state.pop("confirm_indexes", None)
                 st.rerun()
             else:
                 st.error(f"Error: {payload}")
@@ -200,7 +200,7 @@ def render_bootstrap_tab(st, api_url: str) -> None:
                     + ". Directorios vaciados: "
                     + ", ".join(payload.get("directories_emptied", []) or ["(ninguno)"])
                 )
-                st.session_state["confirm_token"] = ""
+                st.session_state.pop("confirm_token", None)
                 st.rerun()
             else:
                 st.error(f"Error: {payload}")

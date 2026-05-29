@@ -45,7 +45,7 @@ from src.ui.i18n import DEFAULT_LOCALE, LOCALES, t
 from src.ui.theme import DEFAULT_THEME, THEMES, theme_css
 
 DEFAULT_API_URL = "http://localhost:8000"
-API_URL = os.getenv("SMART_TOURISM_API_URL", DEFAULT_API_URL)
+API_URL = os.getenv("SMART_TOURISM_API_URL") or DEFAULT_API_URL
 DESCRIPTION_MAX_CHARS = 220
 
 DEFAULT_TOP_K = 10
@@ -401,7 +401,7 @@ def search_by_image_upload(
 ) -> ImageSearchResponse:
     """Envía una imagen al endpoint POST /search/by-image y devuelve los resultados."""
     owns_client = client is None
-    http = client or httpx.Client(base_url=api_url, timeout=30.0)
+    http = client or httpx.Client(base_url=api_url, timeout=90.0)
     try:
         response = http.post(
             "/search/by-image",
@@ -424,7 +424,7 @@ def search_image_by_text_query(
 ) -> ImageSearchResponse:
     """Envía una consulta de texto al endpoint POST /search/image-by-text."""
     owns_client = client is None
-    http = client or httpx.Client(base_url=api_url, timeout=30.0)
+    http = client or httpx.Client(base_url=api_url, timeout=90.0)
     try:
         response = http.post(
             "/search/image-by-text",
