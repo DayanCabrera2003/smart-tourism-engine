@@ -39,8 +39,10 @@ class _StubEmbedder:
 class _FakeCrossEncoder:
     def __init__(self, score):
         self._score = score
+        self.calls = 0
 
     def rerank(self, query, candidates):
+        self.calls += 1
         return [(doc_id, self._score) for doc_id, _text in candidates]
 
 
@@ -83,9 +85,12 @@ def _client(*, ce_score, web_client):
     app.dependency_overrides[get_index] = lambda: _build_index()
     app.dependency_overrides[get_retriever_factory] = lambda: lambda p: ExtendedBoolean(p=p)
     app.dependency_overrides[get_destinations] = lambda: destinations
-    app.dependency_overrides[get_cross_encoder] = lambda: _FakeCrossEncoder(ce_score)
+    cross_encoder = _FakeCrossEncoder(ce_score)
+    app.dependency_overrides[get_cross_encoder] = lambda: cross_encoder
     app.dependency_overrides[get_web_client] = lambda: web_client
-    return TestClient(app)
+    client = TestClient(app)
+    client.cross_encoder = cross_encoder
+    return client
 
 
 def teardown_function():
@@ -124,3 +129,5 @@ def test_search_no_fallback_when_web_client_absent():
     resp = client.post("/search/hybrid", json={"query": "hoteles en alaska", "top_k": 5})
     assert resp.status_code == 200
     assert not any(r["from_web"] for r in resp.json()["results"])
+    # Sin web client el gate se salta entero: no se gasta el cross-encoder.
+    assert client.cross_encoder.calls == 0

@@ -588,24 +588,27 @@ def search_semantic(
     }
     # Web fallback gate: same cross-encoder relevance signal as the hybrid
     # endpoint. The bi-encoder cosine over-scores topically-similar but
-    # geographically-wrong destinations; the cross-encoder catches it.
-    relevance = _max_cross_encoder_relevance(
-        request.query, semantic_pairs, destinations, cross_encoder
-    )
-    if web_client is not None and should_fallback_by_relevance(
-        semantic_pairs,
-        relevance,
-        relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
-    ):
-        semantic_pairs = run_web_fallback(
-            request.query,
-            semantic_pairs,
-            web_client=web_client,
-            embedder=embedder,
-            store=store,
-            collection=collection,
-            destinations=destinations,
+    # geographically-wrong destinations; the cross-encoder catches it. Skip
+    # the gate entirely when there is no web client so a deployment without
+    # Tavily does not pay the cross-encoder pass on every search.
+    if web_client is not None:
+        relevance = _max_cross_encoder_relevance(
+            request.query, semantic_pairs, destinations, cross_encoder
         )
+        if should_fallback_by_relevance(
+            semantic_pairs,
+            relevance,
+            relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
+        ):
+            semantic_pairs = run_web_fallback(
+                request.query,
+                semantic_pairs,
+                web_client=web_client,
+                embedder=embedder,
+                store=store,
+                collection=collection,
+                destinations=destinations,
+            )
     # Cross-encoder runs first so its calibrated relevance feeds the
     # popularity/freshness reranker downstream.
     semantic_pairs = _maybe_cross_encode(
@@ -673,24 +676,27 @@ def search_hybrid(
     # Web fallback gate: the cross-encoder's calibrated relevance, not the
     # fused cosine, decides whether the local results are good enough. When
     # even the best candidate is irrelevant (e.g. "hoteles en alaska" with no
-    # Alaska in the corpus) we bring in web results instead.
-    relevance = _max_cross_encoder_relevance(
-        request.query, pairs, destinations, cross_encoder
-    )
-    if web_client is not None and should_fallback_by_relevance(
-        pairs,
-        relevance,
-        relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
-    ):
-        pairs = run_web_fallback(
-            request.query,
-            pairs,
-            web_client=web_client,
-            embedder=embedder,
-            store=store,
-            collection=collection,
-            destinations=destinations,
+    # Alaska in the corpus) we bring in web results instead. Skip the whole
+    # gate (including the cross-encoder pass) when there is no web client to
+    # fall back to, so a deployment without Tavily pays nothing.
+    if web_client is not None:
+        relevance = _max_cross_encoder_relevance(
+            request.query, pairs, destinations, cross_encoder
         )
+        if should_fallback_by_relevance(
+            pairs,
+            relevance,
+            relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
+        ):
+            pairs = run_web_fallback(
+                request.query,
+                pairs,
+                web_client=web_client,
+                embedder=embedder,
+                store=store,
+                collection=collection,
+                destinations=destinations,
+            )
     # Cross-encoder runs first so its calibrated relevance feeds the
     # popularity/freshness reranker downstream.
     pairs = _maybe_cross_encode(
