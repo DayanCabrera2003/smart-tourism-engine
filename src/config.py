@@ -38,10 +38,11 @@ class Settings(BaseSettings):
     TAVILY_RATE_LIMIT_PER_MINUTE: int = 20
 
     # Umbral de relevancia (cross-encoder, [0,1]) por debajo del cual una
-    # busqueda dispara el fallback web. El cross-encoder sigmoid da scores
-    # muy bajos a pares irrelevantes; 0.10 separa "Hoteles en alaska" (sin
-    # corpus) de queries con resultados validos. Requiere calibracion.
-    WEB_FALLBACK_RELEVANCE_THRESHOLD: float = 0.10
+    # busqueda dispara el fallback web. Calibrado contra el modelo real
+    # (mmarco-mMiniLMv2): queries sin cobertura en el corpus ("hoteles en
+    # alaska", "esqui en antartida") topan en ~0.22, mientras que queries
+    # con resultados validos pisan en ~0.98. 0.40 cae en ese hueco amplio.
+    WEB_FALLBACK_RELEVANCE_THRESHOLD: float = 0.40
 
     # Nivel de logging (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     LOG_LEVEL: str = "INFO"
