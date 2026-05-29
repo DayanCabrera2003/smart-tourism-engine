@@ -138,33 +138,17 @@ class RagPipeline:
         self, query: str, existing_hits: list[tuple[str, float]]
     ) -> list[tuple[str, float]]:
         """Consulta Tavily y devuelve hits locales + resultados web."""
-        from src.web_search.converter import web_result_to_destination
-        from src.web_search.persister import persist_web_destination
+        from src.web_search.fallback import run_web_fallback
 
-        try:
-            web_results = self._web_client.search(query, max_results=5)
-        except RuntimeError:
-            return existing_hits
-
-        extra_hits: list[tuple[str, float]] = []
-        for wr in web_results:
-            dest = web_result_to_destination(wr)
-            persist_web_destination(
-                dest,
-                embedder=self._embedder,
-                store=self._store,
-                collection=self._collection,
-            )
-            self._destinations[dest.id] = {
-                "name": dest.name,
-                "country": dest.country,
-                "description": dest.description,
-                "image_urls": [],
-                "from_web": True,
-            }
-            extra_hits.append((dest.id, 0.5))
-
-        return existing_hits + extra_hits
+        return run_web_fallback(
+            query,
+            existing_hits,
+            web_client=self._web_client,
+            embedder=self._embedder,
+            store=self._store,
+            collection=self._collection,
+            destinations=self._destinations,
+        )
 
     def _retrieve(
         self, query: str, *, top_k: int, mode: str, alpha: float
