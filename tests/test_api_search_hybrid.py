@@ -23,7 +23,6 @@ from src.api.main import (
     get_retriever_factory,
     get_semantic_collection,
     get_vector_store,
-    get_web_client,
 )
 from src.indexing.embed_destinations import slug_to_uuid
 from src.indexing.inverted_index import InvertedIndex
@@ -92,9 +91,6 @@ def _client(destinations: dict | None = None) -> TestClient:
     app.dependency_overrides[get_index] = lambda: index
     app.dependency_overrides[get_retriever_factory] = lambda: lambda p: ExtendedBoolean(p=p)
     app.dependency_overrides[get_destinations] = lambda: destinations or {}
-    # Mantener el test hermetico: sin cliente web no se dispara el fallback,
-    # asi estos casos solo ejercitan la fusion lexico/semantica local.
-    app.dependency_overrides[get_web_client] = lambda: None
     return TestClient(app)
 
 

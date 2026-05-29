@@ -344,6 +344,11 @@ RetrieverFactoryDep = Annotated[
     Callable[[float], ExtendedBoolean], Depends(get_retriever_factory)
 ]
 DestinationsDep = Annotated[dict[str, dict[str, object]], Depends(get_destinations)]
+VectorStoreDep = Annotated[VectorStore, Depends(get_vector_store)]
+EmbedderDep = Annotated[TextEmbedder, Depends(get_embedder)]
+SemanticCollectionDep = Annotated[str, Depends(get_semantic_collection)]
+CrossEncoderDep = Annotated[object, Depends(get_cross_encoder)]
+WebClientDep = Annotated[object, Depends(get_web_client)]
 
 
 def _build_reranker(destinations: dict[str, dict[str, object]]) -> Reranker:
@@ -463,6 +468,47 @@ def _max_cross_encoder_relevance(
     return max(score for _, score in scored)
 
 
+def _maybe_web_fallback(
+    query: str,
+    pairs: list[tuple[str, float]],
+    *,
+    web_client,
+    cross_encoder,
+    embedder,
+    store: VectorStore,
+    collection: str,
+    destinations: dict[str, dict[str, object]],
+) -> list[tuple[str, float]]:
+    """Sustituye los hits locales por resultados web cuando el gate dispara.
+
+    El gate usa la relevancia calibrada del cross-encoder (no el coseno, que
+    sobrevalora coincidencias tematicas). Al disparar se devuelven SOLO los
+    hits web: si ya decidimos que lo local es irrelevante, mostrarlo debajo
+    solo confunde (ademas su coseno e5 ~0.8 quedaria por encima del web).
+
+    Devuelve los ``pairs`` originales sin tocar cuando: no hay cliente web,
+    el gate no dispara, o Tavily no devuelve nada (degradacion: mejor
+    mostrar lo local que una pagina vacia).
+    """
+    if web_client is None:
+        return pairs
+    relevance = _max_cross_encoder_relevance(query, pairs, destinations, cross_encoder)
+    if not should_fallback_by_relevance(
+        pairs, relevance, relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD
+    ):
+        return pairs
+    web_hits = run_web_fallback(
+        query,
+        [],
+        web_client=web_client,
+        embedder=embedder,
+        store=store,
+        collection=collection,
+        destinations=destinations,
+    )
+    return web_hits or pairs
+
+
 def _build_destination_result(
     doc_id: str,
     score: float,
@@ -501,6 +547,11 @@ def search(
     index: IndexDep,
     retriever_factory: RetrieverFactoryDep,
     destinations: DestinationsDep,
+    store: VectorStoreDep,
+    embedder: EmbedderDep,
+    collection: SemanticCollectionDep,
+    cross_encoder: CrossEncoderDep,
+    web_client: WebClientDep,
 ) -> SearchResponse:
     """Busca destinos con el Booleano Extendido (p-norm) y los devuelve rankeados."""
     retriever = retriever_factory(request.p)
@@ -517,25 +568,23 @@ def search(
     filtered = apply_country_filter(
         hits_with_country, request.query, country_getter=lambda h: h[2]
     )
-    reranked = _maybe_rerank(
-        [(doc_id, score) for doc_id, score, _ in filtered],
-        destinations,
-        enabled=request.use_reranker,
+    pairs = [(doc_id, score) for doc_id, score, _ in filtered]
+    pairs = _maybe_web_fallback(
+        request.query,
+        pairs,
+        web_client=web_client,
+        cross_encoder=cross_encoder,
+        embedder=embedder,
+        store=store,
+        collection=collection,
+        destinations=destinations,
     )
+    reranked = _maybe_rerank(pairs, destinations, enabled=request.use_reranker)
     results = [
         _build_destination_result(doc_id, score, destinations)
         for doc_id, score in reranked[: request.top_k]
     ]
     return SearchResponse(results=results)
-
-
-VectorStoreDep = Annotated[VectorStore, Depends(get_vector_store)]
-EmbedderDep = Annotated[TextEmbedder, Depends(get_embedder)]
-SemanticCollectionDep = Annotated[str, Depends(get_semantic_collection)]
-
-
-CrossEncoderDep = Annotated[object, Depends(get_cross_encoder)]
-WebClientDep = Annotated[object, Depends(get_web_client)]
 
 
 @app.post("/search/semantic", response_model=SearchResponse)
@@ -586,29 +635,16 @@ def search_semantic(
         str(payload.get("slug") or point_id): payload
         for point_id, _score, payload in filtered
     }
-    # Web fallback gate: same cross-encoder relevance signal as the hybrid
-    # endpoint. The bi-encoder cosine over-scores topically-similar but
-    # geographically-wrong destinations; the cross-encoder catches it. Skip
-    # the gate entirely when there is no web client so a deployment without
-    # Tavily does not pay the cross-encoder pass on every search.
-    if web_client is not None:
-        relevance = _max_cross_encoder_relevance(
-            request.query, semantic_pairs, destinations, cross_encoder
-        )
-        if should_fallback_by_relevance(
-            semantic_pairs,
-            relevance,
-            relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
-        ):
-            semantic_pairs = run_web_fallback(
-                request.query,
-                semantic_pairs,
-                web_client=web_client,
-                embedder=embedder,
-                store=store,
-                collection=collection,
-                destinations=destinations,
-            )
+    semantic_pairs = _maybe_web_fallback(
+        request.query,
+        semantic_pairs,
+        web_client=web_client,
+        cross_encoder=cross_encoder,
+        embedder=embedder,
+        store=store,
+        collection=collection,
+        destinations=destinations,
+    )
     # Cross-encoder runs first so its calibrated relevance feeds the
     # popularity/freshness reranker downstream.
     semantic_pairs = _maybe_cross_encode(
@@ -673,30 +709,16 @@ def search_hybrid(
         hits_with_country, request.query, country_getter=lambda h: h[2]
     )
     pairs = [(doc_id, score) for doc_id, score, _ in filtered]
-    # Web fallback gate: the cross-encoder's calibrated relevance, not the
-    # fused cosine, decides whether the local results are good enough. When
-    # even the best candidate is irrelevant (e.g. "hoteles en alaska" with no
-    # Alaska in the corpus) we bring in web results instead. Skip the whole
-    # gate (including the cross-encoder pass) when there is no web client to
-    # fall back to, so a deployment without Tavily pays nothing.
-    if web_client is not None:
-        relevance = _max_cross_encoder_relevance(
-            request.query, pairs, destinations, cross_encoder
-        )
-        if should_fallback_by_relevance(
-            pairs,
-            relevance,
-            relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
-        ):
-            pairs = run_web_fallback(
-                request.query,
-                pairs,
-                web_client=web_client,
-                embedder=embedder,
-                store=store,
-                collection=collection,
-                destinations=destinations,
-            )
+    pairs = _maybe_web_fallback(
+        request.query,
+        pairs,
+        web_client=web_client,
+        cross_encoder=cross_encoder,
+        embedder=embedder,
+        store=store,
+        collection=collection,
+        destinations=destinations,
+    )
     # Cross-encoder runs first so its calibrated relevance feeds the
     # popularity/freshness reranker downstream.
     pairs = _maybe_cross_encode(

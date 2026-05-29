@@ -19,7 +19,6 @@ from src.api.main import (
     get_embedder,
     get_semantic_collection,
     get_vector_store,
-    get_web_client,
 )
 from src.indexing.embed_destinations import slug_to_uuid
 from src.indexing.vector_store import VectorStore
@@ -85,9 +84,6 @@ def _client(destinations: dict | None = None) -> TestClient:
     app.dependency_overrides[get_embedder] = lambda: embedder
     app.dependency_overrides[get_semantic_collection] = lambda: COLLECTION
     app.dependency_overrides[get_destinations] = lambda: destinations or {}
-    # Mantener el test hermetico: sin cliente web no se dispara el fallback,
-    # asi estos casos solo ejercitan la rama semantica local.
-    app.dependency_overrides[get_web_client] = lambda: None
     return TestClient(app)
 
 

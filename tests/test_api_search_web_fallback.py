@@ -103,7 +103,20 @@ def test_hybrid_triggers_web_fallback_on_low_relevance():
     resp = client.post("/search/hybrid", json={"query": "hoteles en alaska", "top_k": 5})
     assert resp.status_code == 200
     assert web.calls == 1
-    assert any(r["from_web"] for r in resp.json()["results"])
+    results = resp.json()["results"]
+    # Solo web: el local irrelevante (doc-bangkok) se descarta.
+    assert results and all(r["from_web"] for r in results)
+    assert not any(r["id"] == "doc-bangkok" for r in results)
+
+
+def test_boolean_triggers_web_fallback_on_low_relevance():
+    web = _FakeWebClient()
+    client = _client(ce_score=0.02, web_client=web)
+    resp = client.post("/search", json={"query": "hoteles en alaska", "top_k": 5})
+    assert resp.status_code == 200
+    assert web.calls == 1
+    results = resp.json()["results"]
+    assert results and all(r["from_web"] for r in results)
 
 
 def test_hybrid_no_fallback_when_relevant():
@@ -121,7 +134,8 @@ def test_semantic_triggers_web_fallback_on_low_relevance():
     resp = client.post("/search/semantic", json={"query": "hoteles en alaska", "top_k": 5})
     assert resp.status_code == 200
     assert web.calls == 1
-    assert any(r["from_web"] for r in resp.json()["results"])
+    results = resp.json()["results"]
+    assert results and all(r["from_web"] for r in results)
 
 
 def test_search_no_fallback_when_web_client_absent():
