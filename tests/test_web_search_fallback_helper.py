@@ -46,10 +46,11 @@ def test_run_web_fallback_appends_web_hits_and_registers_destinations():
     )
 
     assert web.calls == 1
-    # Los hits locales se preservan y los web se agregan al final.
-    assert out[0] == ("doc-local", 0.42)
+    # El web encabeza (el fallback solo corre cuando lo local es insuficiente)
+    # y los hits locales se preservan despues.
     assert len(out) == 2
-    web_id = out[1][0]
+    assert out[-1] == ("doc-local", 0.42)
+    web_id = out[0][0]
     assert destinations[web_id]["from_web"] is True
     assert destinations[web_id]["name"] == "Hotels in Alaska"
 

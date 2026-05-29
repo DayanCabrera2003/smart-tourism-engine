@@ -31,12 +31,17 @@ def run_web_fallback(
     destinations: dict[str, dict[str, Any]],
     max_results: int = 5,
 ) -> list[tuple[str, float]]:
-    """Consulta Tavily y devuelve los hits locales seguidos de los web.
+    """Consulta Tavily y devuelve los hits web seguidos de los locales.
 
     Cada resultado web se convierte a Destination, se persiste en SQLite y
     Qdrant, y se registra en ``destinations`` con ``from_web=True`` para que
     la capa de presentacion lo distinga. Si el rate limit esta agotado
     (RuntimeError) se devuelven los hits locales intactos.
+
+    Los web van primero porque esta funcion solo se invoca cuando ya se
+    decidio que los resultados locales son insuficientes: en ese escenario el
+    web es la respuesta principal. Asi, aun sin re-ranking activado, los web
+    encabezan el top_k en lugar de quedar al final de la lista local.
     """
     try:
         web_results = web_client.search(query, max_results=max_results)
@@ -58,4 +63,4 @@ def run_web_fallback(
         }
         extra_hits.append((dest.id, _WEB_HIT_SCORE))
 
-    return existing_hits + extra_hits
+    return extra_hits + existing_hits
