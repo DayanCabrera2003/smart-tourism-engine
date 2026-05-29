@@ -169,6 +169,7 @@ class RagPipeline:
     def _retrieve(
         self, query: str, *, top_k: int, mode: str, alpha: float
     ) -> list[tuple[str, float]]:
+        from src.retrieval.bilingual_query import expand_query, expand_query_boolean
         from src.retrieval.extended_boolean import ExtendedBoolean
         from src.retrieval.hybrid import HybridRetriever
 
@@ -182,7 +183,7 @@ class RagPipeline:
 
         extended = ExtendedBoolean(p=2.0)
         if mode == "boolean":
-            return extended.search(query, self._index, top_k=top_k)
+            return extended.search(expand_query_boolean(query), self._index, top_k=top_k)
 
         retriever = HybridRetriever(
             extended=extended,
@@ -191,7 +192,7 @@ class RagPipeline:
             collection=self._collection,
             alpha=alpha,
         )
-        return retriever.search(query, self._index, top_k=top_k)
+        return retriever.search(expand_query(query), self._index, top_k=top_k)
 
     def _hits_to_results(self, hits: list[tuple[str, float]]) -> list[DestinationResult]:
         results: list[DestinationResult] = []
