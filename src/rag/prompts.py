@@ -11,6 +11,9 @@ basándote ÚNICAMENTE en los siguientes destinos:
 
 Reglas:
 - Usa referencias inline [1], [2], etc. para citar los destinos.
+- Cuando el contexto mencione nombres concretos relevantes a la pregunta \
+(hoteles, lugares, establecimientos o atracciones), nómbralos \
+explícitamente en tu respuesta en vez de describirlos de forma general.
 - Si la información proporcionada no es suficiente para responder, \
 responde exactamente: "No tengo suficiente información para responder."
 - No inventes datos que no aparezcan en el contexto.
