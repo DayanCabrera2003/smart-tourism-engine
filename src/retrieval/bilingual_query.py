@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["expand_query", "BILINGUAL_DICT"]
+__all__ = ["expand_query", "expand_query_boolean", "BILINGUAL_DICT"]
 
 
 # Bidirectional tourism vocabulary. Each entry maps one form to its
@@ -188,3 +188,48 @@ def expand_query(query: str) -> str:
     if not added:
         return query
     return f"{query} {' '.join(added)}"
+
+
+def expand_query_boolean(query: str) -> str:
+    """Wrap recognised keywords as (term OR translation) for boolean retrieval.
+
+    Unlike expand_query (which appends translations at the end), this
+    replaces each matched term inline so the boolean parser treats the
+    original and the translation as alternatives:
+
+        "playa AND Cuba"  →  "(playa OR beach) AND Cuba"
+
+    This preserves the AND/OR/NOT structure of the query while letting
+    English documents match Spanish queries and vice versa.
+    """
+    if not query or not query.strip():
+        return query
+
+    _BOOLEAN_OPS = {"and", "or", "not"}
+    result = query
+    keys = sorted(BILINGUAL_DICT.keys() | _REVERSE_DICT.keys(), key=len, reverse=True)
+
+    for key in keys:
+        key_clean = _strip_accents(key.lower())
+        if key_clean in _BOOLEAN_OPS:
+            continue
+        pattern = re.compile(rf"\b{re.escape(key_clean)}\b", re.IGNORECASE)
+        if not pattern.search(_strip_accents(result.lower())):
+            continue
+        translation = BILINGUAL_DICT.get(key) or _REVERSE_DICT.get(key)
+        if translation is None:
+            continue
+        # Skip if translation is already present in the current result.
+        if re.search(
+            rf"\b{re.escape(_strip_accents(translation.lower()))}\b",
+            _strip_accents(result.lower()),
+        ):
+            continue
+        result = re.sub(
+            rf"\b{re.escape(key)}\b",
+            f"({key} OR {translation})",
+            result,
+            flags=re.IGNORECASE,
+        )
+
+    return result
