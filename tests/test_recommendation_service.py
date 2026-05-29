@@ -19,7 +19,7 @@ def test_build_request_profile_uses_synthetic_persona() -> None:
     profile = build_request_profile("synthetic:mochilero", [], [])
     assert profile is not None
     assert profile.id == "synthetic:mochilero"
-    assert "aventura" in profile.interests
+    assert "aventura en parques naturales" in profile.interests
 
 
 def test_build_request_profile_resolves_persona_without_prefix() -> None:
@@ -31,12 +31,12 @@ def test_build_request_profile_resolves_persona_without_prefix() -> None:
 def test_build_request_profile_merges_extra_interests_and_history() -> None:
     profile = build_request_profile(
         "mochilero",
-        interests=["surf", "aventura"],  # "aventura" already in mochilero
+        interests=["surf", "aventura en parques naturales"],  # phrase already in mochilero
         history=["cusco-pe"],
     )
     assert profile is not None
-    # extra tag appended without duplicating
-    assert profile.interests.count("aventura") == 1
+    # phrase not duplicated because it already appears in the synthetic profile
+    assert profile.interests.count("aventura en parques naturales") == 1
     assert "surf" in profile.interests
     assert profile.history == ["cusco-pe"]
 
