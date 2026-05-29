@@ -26,8 +26,10 @@ from src.indexing.embed_destinations import DEFAULT_COLLECTION as TEXT_COLLECTIO
 from src.indexing.embedder import TextEmbedder
 from src.indexing.vector_store import VectorStore
 from src.ingestion.pipeline import ingest_wikivoyage
+from src.multimodal.image_indexer import IMAGE_COLLECTION
 
 _EMBED_DIM = 384  # multilingual-e5-small
+_CLIP_DIM = 512   # clip-ViT-B-32
 _DEFAULT_PHASES: list[PhaseInfo] = [
     PhaseInfo("detect", "Detectar datos existentes"),
     PhaseInfo("crawl", "Descargar corpus de Wikivoyage"),
@@ -37,6 +39,7 @@ _DEFAULT_PHASES: list[PhaseInfo] = [
     PhaseInfo("popularity", "Calcular popularidad"),
     PhaseInfo("qdrant", "Inicializar coleccion Qdrant"),
     PhaseInfo("embed", "Generar embeddings y subir a Qdrant"),
+    PhaseInfo("embed_images", "Indexar imagenes con CLIP"),
 ]
 
 
@@ -239,6 +242,31 @@ def _embed_text(tracker: BootstrapTracker, store: VectorStore) -> int:
     return sent
 
 
+def _embed_images_phase(tracker: BootstrapTracker, store: VectorStore) -> None:
+    """Crea la colección CLIP y sube embeddings de todas las imágenes disponibles.
+
+    Si no hay imágenes en data/raw/images/, la fase se salta sin error.
+    """
+    from src.multimodal.clip_embedder import ClipEmbedder
+    from src.multimodal.image_indexer import embed_images
+
+    images_dir = settings.DATA_DIR / "raw" / "images"
+    if not images_dir.exists() or not any(
+        f for d in images_dir.iterdir() if d.is_dir()
+        for f in d.iterdir() if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}
+    ):
+        tracker.update_message("Sin imagenes en data/raw/images/; fase omitida")
+        return
+
+    tracker.update_message("Creando coleccion destinations_image")
+    store.create_collection(IMAGE_COLLECTION, vector_size=_CLIP_DIM)
+    tracker.update_message("Cargando modelo CLIP")
+    embedder = ClipEmbedder()
+    tracker.update_message("Indexando imagenes con CLIP")
+    count = embed_images(images_dir, store, embedder)
+    tracker.update_message(f"{count} imagenes indexadas en '{IMAGE_COLLECTION}'")
+
+
 def run(tracker: BootstrapTracker, *, on_done: Callable[[], None] | None = None) -> None:
     """Run the bootstrap pipeline, updating ``tracker`` as it progresses.
 
@@ -284,6 +312,9 @@ def run(tracker: BootstrapTracker, *, on_done: Callable[[], None] | None = None)
 
         tracker.advance()
         _embed_text(tracker, store)
+
+        tracker.advance()
+        _embed_images_phase(tracker, store)
 
         tracker.finish()
     except Exception as exc:
