@@ -79,31 +79,8 @@ class RagPipeline:
                 low_confidence=cached.low_confidence,
             )
 
-        from src.config import settings
-        from src.retrieval.cross_encoder_reranker import max_cross_encoder_relevance
-        from src.web_search.trigger import should_fallback_by_relevance
-
         hits = self._retrieve(query, top_k=top_k, mode=mode, alpha=alpha)
-        # Mismo gate por cross-encoder que los endpoints de busqueda: el
-        # coseno del bi-encoder confunde afinidad tematica con relevancia
-        # ("hoteles en Alaska" da coseno ~0.8 contra cualquier destino
-        # turistico) y deja pasar fuentes basura al LLM. El cross-encoder
-        # con atencion cruzada query-documento lo distingue correctamente.
-        if self._web_client is not None:
-            relevance = max_cross_encoder_relevance(
-                query, hits, self._destinations, self._cross_encoder
-            )
-            if should_fallback_by_relevance(
-                hits,
-                relevance,
-                relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
-            ):
-                # Drop local: si el gate decidio que lo local era
-                # irrelevante, dejarlo en el contexto solo hace que el LLM
-                # cite destinos equivocados.
-                web_hits = self._web_fallback(query, [])
-                if web_hits:
-                    hits = web_hits
+        hits = self._apply_web_fallback_gate(query, hits)
         sources = self._hits_to_results(hits)
         context = build_context(sources)
         prompt = build_prompt(query, context)
@@ -125,6 +102,37 @@ class RagPipeline:
     def _clear_cache(self) -> None:
         self._cache.clear()
 
+    def _apply_web_fallback_gate(
+        self, query: str, hits: list[tuple[str, float]]
+    ) -> list[tuple[str, float]]:
+        """Reemplaza los hits locales por resultados web cuando el gate dispara.
+
+        Mismo gate por cross-encoder que los endpoints de busqueda: el coseno
+        del bi-encoder confunde afinidad tematica con relevancia ("hoteles en
+        Alaska" da coseno ~0.8 contra cualquier destino turistico) y deja
+        pasar fuentes basura al LLM. El cross-encoder con atencion cruzada
+        query-documento lo distingue correctamente. Si el gate dispara, los
+        locales se descartan: dejarlos en el contexto solo hace que el LLM
+        cite destinos equivocados.
+        """
+        if self._web_client is None:
+            return hits
+        from src.config import settings
+        from src.retrieval.cross_encoder_reranker import max_cross_encoder_relevance
+        from src.web_search.trigger import should_fallback_by_relevance
+
+        relevance = max_cross_encoder_relevance(
+            query, hits, self._destinations, self._cross_encoder
+        )
+        if not should_fallback_by_relevance(
+            hits,
+            relevance,
+            relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
+        ):
+            return hits
+        web_hits = self._web_fallback(query, [])
+        return web_hits or hits
+
     def answer_stream(
         self,
         query: str,
@@ -135,6 +143,7 @@ class RagPipeline:
     ) -> Generator[str, None, None]:
         """Itera sobre tokens y emite el evento final JSON con fuentes."""
         hits = self._retrieve(query, top_k=top_k, mode=mode, alpha=alpha)
+        hits = self._apply_web_fallback_gate(query, hits)
         sources = self._hits_to_results(hits)
         context = build_context(sources)
         prompt = build_prompt(query, context)
