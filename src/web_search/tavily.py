@@ -71,7 +71,12 @@ class TavilyClient:
         payload: dict[str, Any] = {
             "api_key": self._api_key,
             "query": query,
-            "search_depth": "basic",
+            # "advanced" usa el motor de busqueda de mayor calidad de Tavily,
+            # que respeta los modificadores semanticos de la query (lugar,
+            # tema). Con "basic" queries como "Mejores playas en alaska" en
+            # español devolvian genericos de playas (Texas, Mexico) ignorando
+            # el modificador geografico, dejando al LLM sin material util.
+            "search_depth": "advanced",
             "max_results": max_results,
         }
         try:
