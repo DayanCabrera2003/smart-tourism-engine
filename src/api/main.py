@@ -62,6 +62,7 @@ from src.indexing.embedder import TextEmbedder
 from src.indexing.inverted_index import InvertedIndex
 from src.indexing.vector_store import VectorStore
 from src.retrieval.bilingual_query import expand_query, expand_query_boolean
+from src.retrieval.cross_encoder_reranker import max_cross_encoder_relevance
 from src.retrieval.extended_boolean import ExtendedBoolean
 from src.retrieval.freshness import freshness_score
 from src.retrieval.geo_filter import (
@@ -263,6 +264,7 @@ def _default_rag_pipeline() -> "RagPipeline":
         destinations=_load_destinations_from_disk(),
         llm=llm,
         web_client=_default_web_client(),
+        cross_encoder=_default_cross_encoder(),
     )
 
 
@@ -437,37 +439,6 @@ def _maybe_cross_encode(
     return blended + tail
 
 
-def _max_cross_encoder_relevance(
-    query: str,
-    hits: list[tuple[str, float]],
-    destinations: dict[str, dict[str, object]],
-    cross_encoder,
-    *,
-    top_n: int = 5,
-) -> float | None:
-    """Relevancia calibrada maxima del cross-encoder sobre el top ``top_n``.
-
-    Devuelve None si el cross-encoder no esta disponible o no hay candidatos,
-    para que el gate degrade al coseno fusionado. Solo puntua el top_n (no los
-    50 del rerank) porque el gate solo necesita saber si el MEJOR candidato es
-    relevante: ~5 pares a 20-40 ms es coste despreciable.
-    """
-    if cross_encoder is None or not hits:
-        return None
-    head = hits[:top_n]
-    candidates: list[tuple[str, str]] = []
-    for doc_id, _score in head:
-        meta = destinations.get(doc_id) or {}
-        name = str(meta.get("name") or doc_id)
-        desc = str(meta.get("description") or "")[:512]
-        text = f"{name}. {desc}" if desc else name
-        candidates.append((doc_id, text))
-    scored = cross_encoder.rerank(query, candidates)
-    if not scored:
-        return None
-    return max(score for _, score in scored)
-
-
 def _maybe_web_fallback(
     query: str,
     pairs: list[tuple[str, float]],
@@ -492,7 +463,7 @@ def _maybe_web_fallback(
     """
     if web_client is None:
         return pairs
-    relevance = _max_cross_encoder_relevance(query, pairs, destinations, cross_encoder)
+    relevance = max_cross_encoder_relevance(query, pairs, destinations, cross_encoder)
     if not should_fallback_by_relevance(
         pairs, relevance, relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD
     ):

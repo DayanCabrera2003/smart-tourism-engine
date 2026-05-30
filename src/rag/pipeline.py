@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 __all__ = ["RagPipeline"]
 
 _CACHE_MAX = 128
-_FALLBACK_THRESHOLD = 0.30
 
 _LOW_CONFIDENCE_PATTERNS = (
     "no tengo suficiente",
@@ -49,6 +48,7 @@ class RagPipeline:
         destinations: dict[str, dict[str, Any]],
         llm: Any,
         web_client: Any | None = None,
+        cross_encoder: Any | None = None,
     ) -> None:
         self._index = index
         self._embedder = embedder
@@ -57,6 +57,7 @@ class RagPipeline:
         self._destinations = destinations
         self._llm = llm
         self._web_client = web_client
+        self._cross_encoder = cross_encoder
         self._cache: dict[str, AskResponse] = {}
 
     def answer(
@@ -78,13 +79,31 @@ class RagPipeline:
                 low_confidence=cached.low_confidence,
             )
 
-        from src.web_search.trigger import should_fallback
+        from src.config import settings
+        from src.retrieval.cross_encoder_reranker import max_cross_encoder_relevance
+        from src.web_search.trigger import should_fallback_by_relevance
 
         hits = self._retrieve(query, top_k=top_k, mode=mode, alpha=alpha)
-        if self._web_client is not None and should_fallback(
-            hits, threshold=_FALLBACK_THRESHOLD
-        ):
-            hits = self._web_fallback(query, hits)
+        # Mismo gate por cross-encoder que los endpoints de busqueda: el
+        # coseno del bi-encoder confunde afinidad tematica con relevancia
+        # ("hoteles en Alaska" da coseno ~0.8 contra cualquier destino
+        # turistico) y deja pasar fuentes basura al LLM. El cross-encoder
+        # con atencion cruzada query-documento lo distingue correctamente.
+        if self._web_client is not None:
+            relevance = max_cross_encoder_relevance(
+                query, hits, self._destinations, self._cross_encoder
+            )
+            if should_fallback_by_relevance(
+                hits,
+                relevance,
+                relevance_threshold=settings.WEB_FALLBACK_RELEVANCE_THRESHOLD,
+            ):
+                # Drop local: si el gate decidio que lo local era
+                # irrelevante, dejarlo en el contexto solo hace que el LLM
+                # cite destinos equivocados.
+                web_hits = self._web_fallback(query, [])
+                if web_hits:
+                    hits = web_hits
         sources = self._hits_to_results(hits)
         context = build_context(sources)
         prompt = build_prompt(query, context)

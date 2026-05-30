@@ -20,7 +20,11 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-__all__ = ["CrossEncoderReranker", "DEFAULT_CROSS_ENCODER_MODEL"]
+__all__ = [
+    "CrossEncoderReranker",
+    "DEFAULT_CROSS_ENCODER_MODEL",
+    "max_cross_encoder_relevance",
+]
 
 DEFAULT_CROSS_ENCODER_MODEL = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 
@@ -76,6 +80,38 @@ class CrossEncoderReranker:
             scored.append((doc_id, _sigmoid(float(raw))))
         scored.sort(key=lambda hit: hit[1], reverse=True)
         return scored
+
+
+def max_cross_encoder_relevance(
+    query: str,
+    hits: list[tuple[str, float]],
+    destinations: dict[str, dict[str, Any]],
+    cross_encoder: Optional[Any],
+    *,
+    top_n: int = 5,
+) -> Optional[float]:
+    """Maxima relevancia calibrada del cross-encoder sobre los mejores ``top_n``.
+
+    Devuelve ``None`` cuando no se puede computar (cross-encoder ausente o
+    sin candidatos); el consumidor debe degradar a otra señal en ese caso.
+    Solo puntua el top_n (no los 50 del rerank general): el gate solo
+    necesita saber si el MEJOR candidato es relevante, y ~5 pares a 20-40 ms
+    cada uno es coste despreciable comparado con el rerank completo.
+    """
+    if cross_encoder is None or not hits:
+        return None
+    head = hits[:top_n]
+    candidates: list[tuple[str, str]] = []
+    for doc_id, _score in head:
+        meta = destinations.get(doc_id) or {}
+        name = str(meta.get("name") or doc_id)
+        desc = str(meta.get("description") or "")[:512]
+        text = f"{name}. {desc}" if desc else name
+        candidates.append((doc_id, text))
+    scored = cross_encoder.rerank(query, candidates)
+    if not scored:
+        return None
+    return max(score for _, score in scored)
 
 
 def _sigmoid(x: float) -> float:
